@@ -3,7 +3,9 @@ from defs.events import ServerToMainThreadEvent
 from sorter_controller import SorterController
 
 
-def handleServerToMainEvent(gc: GlobalConfig, controller: SorterController, event: ServerToMainThreadEvent) -> None:
+def handleServerToMainEvent(
+    gc: GlobalConfig, controller: SorterController, event: ServerToMainThreadEvent
+) -> None:
     if event.tag == "heartbeat":
         gc.logger.info(f"received heartbeat from server at {event.data.timestamp}")
     else:

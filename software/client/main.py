@@ -40,7 +40,9 @@ def main() -> None:
     server_thread = threading.Thread(target=runServer, daemon=True)
     server_thread.start()
 
-    broadcaster_thread = threading.Thread(target=runBroadcaster, args=(gc,), daemon=True)
+    broadcaster_thread = threading.Thread(
+        target=runBroadcaster, args=(gc,), daemon=True
+    )
     broadcaster_thread.start()
 
     last_heartbeat = time.time()
@@ -55,7 +57,9 @@ def main() -> None:
         # send periodic heartbeat
         current_time = time.time()
         if current_time - last_heartbeat >= gc.timeouts.heartbeat_interval:
-            heartbeat = HeartbeatEvent(tag="heartbeat", data=HeartbeatData(timestamp=current_time))
+            heartbeat = HeartbeatEvent(
+                tag="heartbeat", data=HeartbeatData(timestamp=current_time)
+            )
             main_to_server_queue.put(heartbeat)
             last_heartbeat = current_time
 
