@@ -4,9 +4,11 @@ from logger import Logger
 
 class Timeouts:
     main_loop_sleep: float
+    heartbeat_interval: float
 
     def __init__(self):
         self.main_loop_sleep = 0.1
+        self.heartbeat_interval = 5.0
 
 
 class GlobalConfig:

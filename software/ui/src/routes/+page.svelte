@@ -1,29 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { connectWebSocket } from '$lib/api/ws';
+	import type { SocketEvent } from '$lib/api/events';
 
 	let ws: WebSocket | null = null;
-	let events: any[] = $state([]);
+	let events: SocketEvent[] = $state([]);
 
 	onMount(() => {
-		ws = new WebSocket('ws://localhost:8000/ws');
-
-		ws.onopen = () => {
-			console.log('WebSocket connected');
-		};
-
-		ws.onmessage = (event) => {
-			const data = JSON.parse(event.data);
-			console.log('Received event:', data);
-			events.push(data);
-		};
-
-		ws.onerror = (error) => {
-			console.error('WebSocket error:', error);
-		};
-
-		ws.onclose = () => {
-			console.log('WebSocket disconnected');
-		};
+		ws = connectWebSocket(
+			'ws://localhost:8000/ws',
+			(event) => {
+				if (event.tag === 'heartbeat') {
+					console.log(`[HEARTBEAT] timestamp: ${event.data.timestamp}`);
+				} else {
+					console.log('Received event:', event);
+				}
+				events.push(event);
+			}
+		);
 
 		return () => {
 			ws?.close();
@@ -37,6 +31,12 @@
 <h2>Events:</h2>
 <ul>
 	{#each events as event}
-		<li>{JSON.stringify(event)}</li>
+		<li>
+			{#if event.tag === 'heartbeat'}
+				<strong>Heartbeat</strong>: {new Date(event.data.timestamp * 1000).toLocaleTimeString()}
+			{:else}
+				{JSON.stringify(event)}
+			{/if}
+		</li>
 	{/each}
 </ul>

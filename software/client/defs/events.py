@@ -2,15 +2,15 @@ from pydantic import BaseModel
 from typing import Literal, Union
 
 
-class MachineStartedData(BaseModel):
+class HeartbeatData(BaseModel):
     timestamp: float
 
 
-class MachineStartedEvent(BaseModel):
-    tag: Literal["machine_started"]
-    data: MachineStartedData
+class HeartbeatEvent(BaseModel):
+    tag: Literal["heartbeat"]
+    data: HeartbeatData
 
 
-SocketEvent = Union[MachineStartedEvent]
-MainThreadToServerCommand = Union[MachineStartedEvent]
-ServerToMainThreadEvent = Union[MachineStartedEvent]
+SocketEvent = Union[HeartbeatEvent]
+MainThreadToServerCommand = Union[HeartbeatEvent]
+ServerToMainThreadEvent = Union[HeartbeatEvent]

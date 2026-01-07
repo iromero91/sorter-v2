@@ -16,7 +16,9 @@ generate:
 	@echo "Starting FastAPI server..."
 	@$(PYTHON) client/main.py & echo $$! > .api.pid
 	@sleep 2
-	@echo "Generating TypeScript types..."
-	@cd ui && npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api.ts
+	@echo "Generating REST API types..."
+	@cd ui && npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api/rest.ts
 	@kill $$(cat .api.pid) && rm .api.pid
-	@echo "Types generated in ui/src/lib/api.ts"
+	@echo "Generating WebSocket event types..."
+	@$(PYTHON) scripts/export_types.py ui/src/lib/api/events.ts
+	@echo "Types generated in ui/src/lib/api/"
