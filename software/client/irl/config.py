@@ -1,6 +1,6 @@
-import os
 from global_config import GlobalConfig
 from .dc_motor import DCMotor
+from .mcu import MCU
 
 
 class CameraConfig:
@@ -23,6 +23,7 @@ class DCMotorConfig:
 
 
 class IRLConfig:
+    mc_path: str
     feeder_camera: CameraConfig
     first_v_channel_dc_motor: DCMotorConfig
     second_v_channel_dc_motor: DCMotorConfig
@@ -33,12 +34,30 @@ class IRLConfig:
 
 
 class IRLInterface:
+    mcu: MCU
     first_v_channel_dc_motor: DCMotor
     second_v_channel_dc_motor: DCMotor
     third_v_channel_dc_motor: DCMotor
 
     def __init__(self):
         pass
+
+    def shutdownMotors(self) -> None:
+        self.first_v_channel_dc_motor.setSpeed(0)
+        self.second_v_channel_dc_motor.setSpeed(0)
+        self.third_v_channel_dc_motor.setSpeed(0)
+
+        self.mcu.command("D", self.first_v_channel_dc_motor.input_1_pin, 0)
+        self.mcu.command("D", self.first_v_channel_dc_motor.input_2_pin, 0)
+        self.mcu.command("D", self.first_v_channel_dc_motor.enable_pin, 0)
+
+        self.mcu.command("D", self.second_v_channel_dc_motor.input_1_pin, 0)
+        self.mcu.command("D", self.second_v_channel_dc_motor.input_2_pin, 0)
+        self.mcu.command("D", self.second_v_channel_dc_motor.enable_pin, 0)
+
+        self.mcu.command("D", self.third_v_channel_dc_motor.input_1_pin, 0)
+        self.mcu.command("D", self.third_v_channel_dc_motor.input_2_pin, 0)
+        self.mcu.command("D", self.third_v_channel_dc_motor.enable_pin, 0)
 
 
 def mkCameraConfig(
@@ -63,17 +82,14 @@ def mkDCMotorConfig(
 
 
 def mkIRLConfig() -> IRLConfig:
-    feeder_camera_index = os.getenv("FEEDER_CAMERA_INDEX")
-    if feeder_camera_index is None:
-        raise ValueError("FEEDER_CAMERA_INDEX environment variable must be set")
-
     irl_config = IRLConfig()
-    irl_config.feeder_camera = mkCameraConfig(int(feeder_camera_index))
+    irl_config.mc_path = "/dev/cu.usbserial-112410"
+    irl_config.feeder_camera = mkCameraConfig(device_index=0)
     irl_config.first_v_channel_dc_motor = mkDCMotorConfig(
         enable_pin=9, input_1_pin=12, input_2_pin=13
     )
     irl_config.second_v_channel_dc_motor = mkDCMotorConfig(
-        enable_pin=6, input_1_pin=8, input_2_pin=11
+        enable_pin=10, input_1_pin=14, input_2_pin=15
     )
     irl_config.third_v_channel_dc_motor = mkDCMotorConfig(
         enable_pin=5, input_1_pin=4, input_2_pin=7
@@ -84,8 +100,12 @@ def mkIRLConfig() -> IRLConfig:
 def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
     irl_interface = IRLInterface()
 
+    mcu = MCU(gc, config.mc_path)
+    irl_interface.mcu = mcu
+
     irl_interface.first_v_channel_dc_motor = DCMotor(
         gc,
+        mcu,
         config.first_v_channel_dc_motor.enable_pin,
         config.first_v_channel_dc_motor.input_1_pin,
         config.first_v_channel_dc_motor.input_2_pin,
@@ -93,6 +113,7 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
 
     irl_interface.second_v_channel_dc_motor = DCMotor(
         gc,
+        mcu,
         config.second_v_channel_dc_motor.enable_pin,
         config.second_v_channel_dc_motor.input_1_pin,
         config.second_v_channel_dc_motor.input_2_pin,
@@ -100,6 +121,7 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
 
     irl_interface.third_v_channel_dc_motor = DCMotor(
         gc,
+        mcu,
         config.third_v_channel_dc_motor.enable_pin,
         config.third_v_channel_dc_motor.input_1_pin,
         config.third_v_channel_dc_motor.input_2_pin,

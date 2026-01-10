@@ -1,11 +1,16 @@
 PYTHON := /opt/homebrew/opt/python@3.11/bin/python3.11
 
+kill:
+	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@pkill -9 -f "client/main.py" 2>/dev/null || true
+	@echo "Killed processes on port 8000 and any zombie client/main.py processes"
+
 install:
 	$(PYTHON) -m pip install -r client/requirements.txt
 	cd ui && npm install
 
 run:
-	$(PYTHON) client/main.py & cd ui && npm run dev
+	@bash -c 'trap "kill 0" SIGINT; $(PYTHON) client/main.py & cd ui && npm run dev'
 upload:
 	mpremote cp firmware/feeder/main.py :main.py
 format:
