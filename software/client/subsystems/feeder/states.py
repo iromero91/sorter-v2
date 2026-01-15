@@ -1,6 +1,6 @@
 from enum import Enum
 
 
-class SortingState(Enum):
+class FeederState(Enum):
     IDLE = "idle"
     FEEDING = "feeding"

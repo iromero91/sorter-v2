@@ -1,7 +1,7 @@
 from typing import Optional
-from .base_state import BaseState
-from .shared_variables import SharedVariables
-from defs.sorting_state import SortingState
+from states.base_state import BaseState
+from subsystems.shared_variables import SharedVariables
+from .states import FeederState
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 
@@ -12,10 +12,10 @@ class Idle(BaseState):
         self.shared = shared
         self.should_start = False
 
-    def step(self) -> Optional[SortingState]:
+    def step(self) -> Optional[FeederState]:
         if self.should_start:
             self.should_start = False
-            return SortingState.FEEDING
+            return FeederState.FEEDING
         return None
 
     def cleanup(self) -> None:

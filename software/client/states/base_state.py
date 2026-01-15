@@ -1,14 +1,16 @@
 import threading
-from typing import Optional
+from typing import Optional, TypeVar
+from enum import Enum
 from .istate_machine import IStateMachine
-from defs.sorting_state import SortingState
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 
 THREAD_STOP_TIMEOUT_S = 2.0
 
+T = TypeVar("T", bound=Enum)
 
-class BaseState(IStateMachine):
+
+class BaseState(IStateMachine[T]):
     def __init__(self, irl: IRLInterface, gc: GlobalConfig):
         self.irl = irl
         self.gc = gc
@@ -16,7 +18,7 @@ class BaseState(IStateMachine):
         self._execution_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
 
-    def step(self) -> Optional[SortingState]:
+    def step(self) -> Optional[T]:
         return None
 
     def cleanup(self) -> None:

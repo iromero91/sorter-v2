@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Optional
-from defs.sorting_state import SortingState
+from typing import Optional, TypeVar, Generic
+from enum import Enum
+
+T = TypeVar("T", bound=Enum)
 
 
-class IStateMachine(ABC):
+class IStateMachine(ABC, Generic[T]):
     @abstractmethod
-    def step(self) -> Optional[SortingState]:
+    def step(self) -> Optional[T]:
         pass
 
     @abstractmethod

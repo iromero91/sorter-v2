@@ -1,8 +1,8 @@
 import time
 from typing import Optional
-from .base_state import BaseState
-from .shared_variables import SharedVariables
-from defs.sorting_state import SortingState
+from states.base_state import BaseState
+from subsystems.shared_variables import SharedVariables
+from .states import FeederState
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 
@@ -15,20 +15,26 @@ class Feeding(BaseState):
     def __init__(self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables):
         super().__init__(irl, gc)
         self.shared = shared
-        self.sequence_complete = False
+        self.piece_ready = False
 
-    def step(self) -> Optional[SortingState]:
+    def step(self) -> Optional[FeederState]:
         self._ensureExecutionThreadStarted()
-        if self.sequence_complete:
-            return SortingState.IDLE
+
+        if self.piece_ready:
+            if self.shared.classification_ready:
+                self.shared.classification_ready = False
+                self.shared.piece_at_classification = True
+                return FeederState.IDLE
         return None
 
     def cleanup(self) -> None:
         super().cleanup()
-        self.sequence_complete = False
+        self.piece_ready = False
+        self.irl.second_v_channel_dc_motor.setSpeed(0)
+        self.irl.third_v_channel_dc_motor.setSpeed(0)
 
     def _executionLoop(self) -> None:
-        self.logger.info("Starting second motor pulse")
+        self.logger.info("Feeder: starting second motor pulse")
         self.irl.second_v_channel_dc_motor.setSpeed(
             self.gc.default_motor_speeds.second_v_channel
         )
@@ -39,14 +45,14 @@ class Feeding(BaseState):
             return
 
         self.irl.second_v_channel_dc_motor.setSpeed(0)
-        self.logger.info("Second motor pulse complete")
+        self.logger.info("Feeder: second motor pulse complete")
 
         time.sleep(PAUSE_BETWEEN_PULSES_MS / 1000.0)
 
         if self._stop_event.is_set():
             return
 
-        self.logger.info("Starting third motor pulse")
+        self.logger.info("Feeder: starting third motor pulse")
         self.irl.third_v_channel_dc_motor.setSpeed(
             self.gc.default_motor_speeds.third_v_channel
         )
@@ -57,8 +63,6 @@ class Feeding(BaseState):
             return
 
         self.irl.third_v_channel_dc_motor.setSpeed(0)
-        self.logger.info("Third motor pulse complete")
+        self.logger.info("Feeder: third motor pulse complete, piece ready")
 
-        time.sleep(PAUSE_BETWEEN_PULSES_MS / 1000.0)
-
-        self.sequence_complete = True
+        self.piece_ready = True
