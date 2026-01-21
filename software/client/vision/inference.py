@@ -12,6 +12,7 @@ class CameraModelBinding:
     model: Optional[YOLO]
     latest_result: Optional[VisionResult]
     latest_annotated_frame: Optional[CameraFrame]
+    latest_raw_results: Optional[List]
     last_processed_timestamp: float
 
     def __init__(self, camera: CaptureThread, model_path: Optional[str]):
@@ -19,6 +20,7 @@ class CameraModelBinding:
         self.model = YOLO(model_path) if model_path else None
         self.latest_result = None
         self.latest_annotated_frame = None
+        self.latest_raw_results = None
         self.last_processed_timestamp = 0.0
 
 
@@ -96,6 +98,7 @@ class InferenceThread:
                     annotated = results[0].plot()
 
                 binding.latest_result = result
+                binding.latest_raw_results = results
                 binding.latest_annotated_frame = CameraFrame(
                     raw=frame.raw,
                     annotated=annotated,

@@ -52,6 +52,7 @@ def main() -> None:
     gc.logger.info("client starting...")
 
     vision.start()
+    controller.start()
 
     server_thread = threading.Thread(target=runServer, daemon=True)
     server_thread.start()
@@ -74,16 +75,16 @@ def main() -> None:
 
             current_time = time.time()
 
-            # send periodic heartbeat
-            if (
-                current_time - last_heartbeat
-                >= gc.timeouts.heartbeat_interval_ms / 1000.0
-            ):
-                heartbeat = HeartbeatEvent(
-                    tag="heartbeat", data=HeartbeatData(timestamp=current_time)
-                )
-                main_to_server_queue.put(heartbeat)
-                last_heartbeat = current_time
+            # # send periodic heartbeat
+            # if (
+            #     current_time - last_heartbeat
+            #     >= gc.timeouts.heartbeat_interval_ms / 1000.0
+            # ):
+            #     heartbeat = HeartbeatEvent(
+            #         tag="heartbeat", data=HeartbeatData(timestamp=current_time)
+            #     )
+            #     main_to_server_queue.put(heartbeat)
+            #     last_heartbeat = current_time
 
             # broadcast camera frames
             if (

@@ -27,3 +27,5 @@ generate:
 	@echo "Generating WebSocket event types..."
 	@$(PYTHON) scripts/export_types.py ui/src/lib/api/events.ts
 	@echo "Types generated in ui/src/lib/api/"
+list-cameras:
+	ffmpeg -f avfoundation -list_devices true -i ""

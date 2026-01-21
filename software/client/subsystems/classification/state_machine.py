@@ -2,22 +2,45 @@ from subsystems.base_subsystem import BaseSubsystem
 from subsystems.shared_variables import SharedVariables
 from .states import ClassificationState
 from .idle import Idle
-from .classifying import Classifying
+from .detecting import Detecting
+from .rotating import Rotating
+from .snapping import Snapping
+from .carousel import Carousel
 from irl.config import IRLInterface
 from global_config import GlobalConfig
+from vision import VisionManager
+from classification import BrickognizeClient
 
 
 class ClassificationStateMachine(BaseSubsystem):
-    def __init__(self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables):
+    def __init__(
+        self,
+        irl: IRLInterface,
+        gc: GlobalConfig,
+        shared: SharedVariables,
+        vision: VisionManager,
+    ):
         super().__init__()
         self.irl = irl
         self.gc = gc
         self.logger = gc.logger
         self.shared = shared
+        self.vision = vision
+        self.carousel = Carousel(gc.logger)
+        self.brickognize = BrickognizeClient(gc)
         self.current_state = ClassificationState.IDLE
+
         self.states_map = {
-            ClassificationState.IDLE: Idle(irl, gc, shared),
-            ClassificationState.CLASSIFYING: Classifying(irl, gc, shared),
+            ClassificationState.IDLE: Idle(irl, gc, shared, self.carousel),
+            ClassificationState.DETECTING: Detecting(
+                irl, gc, shared, self.carousel, vision
+            ),
+            ClassificationState.ROTATING: Rotating(
+                irl, gc, shared, self.carousel, irl.carousel_stepper
+            ),
+            ClassificationState.SNAPPING: Snapping(
+                irl, gc, shared, self.carousel, vision, self.brickognize
+            ),
         }
 
     def step(self) -> None:

@@ -1,6 +1,7 @@
 from global_config import GlobalConfig
 from .dc_motor import DCMotor
 from .mcu import MCU
+from .stepper import Stepper
 
 
 class CameraConfig:
@@ -22,6 +23,15 @@ class DCMotorConfig:
         pass
 
 
+class StepperConfig:
+    step_pin: int
+    dir_pin: int
+    enable_pin: int
+
+    def __init__(self):
+        pass
+
+
 class IRLConfig:
     mcu_path: str
     second_mcu_path: str
@@ -31,6 +41,8 @@ class IRLConfig:
     first_v_channel_dc_motor: DCMotorConfig
     second_v_channel_dc_motor: DCMotorConfig
     third_v_channel_dc_motor: DCMotorConfig
+    carousel_stepper: StepperConfig
+    chute_stepper: StepperConfig
 
     def __init__(self):
         pass
@@ -42,6 +54,8 @@ class IRLInterface:
     first_v_channel_dc_motor: DCMotor
     second_v_channel_dc_motor: DCMotor
     third_v_channel_dc_motor: DCMotor
+    carousel_stepper: Stepper
+    chute_stepper: Stepper
 
     def __init__(self):
         pass
@@ -85,13 +99,21 @@ def mkDCMotorConfig(
     return dc_motor_config
 
 
+def mkStepperConfig(step_pin: int, dir_pin: int, enable_pin: int) -> StepperConfig:
+    stepper_config = StepperConfig()
+    stepper_config.step_pin = step_pin
+    stepper_config.dir_pin = dir_pin
+    stepper_config.enable_pin = enable_pin
+    return stepper_config
+
+
 def mkIRLConfig() -> IRLConfig:
     irl_config = IRLConfig()
-    irl_config.mcu_path = "/dev/cu.usbserial-1420"
+    irl_config.mcu_path = "/dev/cu.usbserial-11420"
     irl_config.second_mcu_path = "/dev/cu.usbmodem1141401"
-    irl_config.feeder_camera = mkCameraConfig(device_index=1)
-    irl_config.classification_camera_bottom = mkCameraConfig(device_index=3)
-    irl_config.classification_camera_top = mkCameraConfig(device_index=2)
+    irl_config.feeder_camera = mkCameraConfig(device_index=0)
+    irl_config.classification_camera_bottom = mkCameraConfig(device_index=2)
+    irl_config.classification_camera_top = mkCameraConfig(device_index=1)
     irl_config.first_v_channel_dc_motor = mkDCMotorConfig(
         enable_pin=9, input_1_pin=12, input_2_pin=13
     )
@@ -101,6 +123,10 @@ def mkIRLConfig() -> IRLConfig:
     irl_config.third_v_channel_dc_motor = mkDCMotorConfig(
         enable_pin=5, input_1_pin=4, input_2_pin=7
     )
+    irl_config.carousel_stepper = mkStepperConfig(
+        step_pin=36, dir_pin=34, enable_pin=30
+    )
+    irl_config.chute_stepper = mkStepperConfig(step_pin=26, dir_pin=28, enable_pin=24)
     return irl_config
 
 
@@ -135,6 +161,22 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
         config.third_v_channel_dc_motor.enable_pin,
         config.third_v_channel_dc_motor.input_1_pin,
         config.third_v_channel_dc_motor.input_2_pin,
+    )
+
+    irl_interface.carousel_stepper = Stepper(
+        gc,
+        second_mcu,
+        config.carousel_stepper.step_pin,
+        config.carousel_stepper.dir_pin,
+        config.carousel_stepper.enable_pin,
+    )
+
+    irl_interface.chute_stepper = Stepper(
+        gc,
+        second_mcu,
+        config.chute_stepper.step_pin,
+        config.chute_stepper.dir_pin,
+        config.chute_stepper.enable_pin,
     )
 
     return irl_interface

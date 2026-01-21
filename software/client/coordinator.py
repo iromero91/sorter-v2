@@ -18,7 +18,7 @@ class Coordinator:
         self.shared = SharedVariables()
 
         self.distribution = DistributionStateMachine(irl, gc, self.shared)
-        self.classification = ClassificationStateMachine(irl, gc, self.shared)
+        self.classification = ClassificationStateMachine(irl, gc, self.shared, vision)
         self.feeder = FeederStateMachine(irl, gc, self.shared)
 
     def step(self) -> None:

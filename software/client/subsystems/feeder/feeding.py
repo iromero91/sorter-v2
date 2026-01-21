@@ -15,15 +15,10 @@ class Feeding(BaseState):
     def __init__(self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables):
         super().__init__(irl, gc)
         self.shared = shared
-        self.piece_ready = False
 
     def step(self) -> Optional[FeederState]:
         self._ensureExecutionThreadStarted()
 
-        if self.piece_ready:
-            if self.shared.classification_ready:
-                self.shared.classification_ready = False
-                return FeederState.IDLE
         return None
 
     def cleanup(self) -> None:
@@ -63,5 +58,3 @@ class Feeding(BaseState):
 
         self.irl.third_v_channel_dc_motor.setSpeed(0)
         self.logger.info("Feeder: third motor pulse complete, piece ready")
-
-        self.piece_ready = True

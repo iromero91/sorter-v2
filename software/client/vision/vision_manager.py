@@ -1,6 +1,8 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Tuple
 import base64
+import time
 import cv2
+import numpy as np
 
 from global_config import GlobalConfig
 from irl.config import IRLConfig
@@ -111,6 +113,42 @@ class VisionManager:
         elif camera_name == "classification_top":
             return self.classification_top_result
         return None
+
+    def getFeederMasksByClass(self) -> Dict[int, List[np.ndarray]]:
+        results = self._feeder_binding.latest_raw_results
+        if not results or len(results) == 0:
+            return {}
+
+        masks_by_class: Dict[int, List[np.ndarray]] = {}
+        for result in results:
+            if result.masks is not None:
+                for i, mask in enumerate(result.masks):
+                    class_id = int(result.boxes[i].cls.item())
+                    mask_data = mask.data[0].cpu().numpy()
+                    if class_id not in masks_by_class:
+                        masks_by_class[class_id] = []
+                    masks_by_class[class_id].append(mask_data)
+        return masks_by_class
+
+    def captureFreshClassificationFrames(
+        self, timeout_s: float = 1.0
+    ) -> Tuple[Optional[CameraFrame], Optional[CameraFrame]]:
+        start_time = time.time()
+        while time.time() - start_time < timeout_s:
+            top = self._classification_top_capture.latest_frame
+            bottom = self._classification_bottom_capture.latest_frame
+            if (
+                top
+                and bottom
+                and top.timestamp > start_time
+                and bottom.timestamp > start_time
+            ):
+                return (top, bottom)
+            time.sleep(0.05)
+        return (
+            self._classification_top_capture.latest_frame,
+            self._classification_bottom_capture.latest_frame,
+        )
 
     def _encodeFrame(self, frame) -> str:
         _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])

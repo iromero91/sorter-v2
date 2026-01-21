@@ -69,5 +69,28 @@ void processCommand(String cmd) {
       Serial.println(value);
       break;
     }
+
+    case 'T': {
+      int c1 = args.indexOf(',');
+      int c2 = args.indexOf(',', c1 + 1);
+      int c3 = args.indexOf(',', c2 + 1);
+      int step_pin = args.substring(0, c1).toInt();
+      int dir_pin = args.substring(c1 + 1, c2).toInt();
+      int steps = args.substring(c2 + 1, c3).toInt();
+      int delay_us = args.substring(c3 + 1).toInt();
+
+      digitalWrite(dir_pin, steps >= 0 ? HIGH : LOW);
+      int abs_steps = steps >= 0 ? steps : -steps;
+      for (int i = 0; i < abs_steps; i++) {
+        digitalWrite(step_pin, HIGH);
+        delayMicroseconds(delay_us);
+        digitalWrite(step_pin, LOW);
+        delayMicroseconds(delay_us);
+      }
+      Serial.print("Stepper ");
+      Serial.print(steps);
+      Serial.println(" steps done");
+      break;
+    }
   }
 }
