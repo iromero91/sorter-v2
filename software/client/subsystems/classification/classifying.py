@@ -21,7 +21,6 @@ class Classifying(BaseState):
         if self.classification_done:
             if self.shared.distribution_ready:
                 self.shared.distribution_ready = False
-                self.shared.piece_at_distribution = True
                 self.shared.classification_ready = True
                 return ClassificationState.IDLE
         return None

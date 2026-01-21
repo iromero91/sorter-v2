@@ -12,8 +12,7 @@ class Idle(BaseState):
         self.shared = shared
 
     def step(self) -> Optional[DistributionState]:
-        if self.shared.piece_at_distribution:
-            self.shared.piece_at_distribution = False
+        if not self.shared.distribution_ready:
             return DistributionState.SENDING
         return None
 

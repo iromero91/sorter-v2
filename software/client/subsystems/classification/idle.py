@@ -12,9 +12,7 @@ class Idle(BaseState):
         self.shared = shared
 
     def step(self) -> Optional[ClassificationState]:
-        if self.shared.piece_at_classification:
-            self.shared.piece_at_classification = False
-            self.shared.classification_ready = False
+        if not self.shared.classification_ready:
             return ClassificationState.CLASSIFYING
         return None
 

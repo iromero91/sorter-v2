@@ -23,7 +23,6 @@ class Feeding(BaseState):
         if self.piece_ready:
             if self.shared.classification_ready:
                 self.shared.classification_ready = False
-                self.shared.piece_at_classification = True
                 return FeederState.IDLE
         return None
 

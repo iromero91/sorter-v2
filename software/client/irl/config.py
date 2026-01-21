@@ -23,7 +23,8 @@ class DCMotorConfig:
 
 
 class IRLConfig:
-    mc_path: str
+    mcu_path: str
+    second_mcu_path: str
     feeder_camera: CameraConfig
     classification_camera_bottom: CameraConfig
     classification_camera_top: CameraConfig
@@ -37,6 +38,7 @@ class IRLConfig:
 
 class IRLInterface:
     mcu: MCU
+    second_mcu: MCU
     first_v_channel_dc_motor: DCMotor
     second_v_channel_dc_motor: DCMotor
     third_v_channel_dc_motor: DCMotor
@@ -85,7 +87,8 @@ def mkDCMotorConfig(
 
 def mkIRLConfig() -> IRLConfig:
     irl_config = IRLConfig()
-    irl_config.mc_path = "/dev/cu.usbserial-1420"
+    irl_config.mcu_path = "/dev/cu.usbserial-1420"
+    irl_config.second_mcu_path = "/dev/cu.usbmodem1141401"
     irl_config.feeder_camera = mkCameraConfig(device_index=1)
     irl_config.classification_camera_bottom = mkCameraConfig(device_index=3)
     irl_config.classification_camera_top = mkCameraConfig(device_index=2)
@@ -104,8 +107,11 @@ def mkIRLConfig() -> IRLConfig:
 def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
     irl_interface = IRLInterface()
 
-    mcu = MCU(gc, config.mc_path)
+    mcu = MCU(gc, config.mcu_path)
     irl_interface.mcu = mcu
+
+    second_mcu = MCU(gc, config.second_mcu_path)
+    irl_interface.second_mcu = second_mcu
 
     irl_interface.first_v_channel_dc_motor = DCMotor(
         gc,
