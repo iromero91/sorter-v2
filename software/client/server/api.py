@@ -1,7 +1,8 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from pathlib import Path
+import asyncio
 import uuid
 
 from defs.events import IdentityEvent, MachineIdentityData
@@ -9,6 +10,14 @@ from defs.events import IdentityEvent, MachineIdentityData
 app = FastAPI(title="Sorter API", version="0.0.1")
 
 active_connections: List[WebSocket] = []
+server_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+@app.on_event("startup")
+async def onStartup() -> None:
+    global server_loop
+    server_loop = asyncio.get_running_loop()
+
 
 MACHINE_ID_FILE = Path.home() / ".sorter_machine_id"
 
@@ -51,5 +60,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 
 async def broadcastEvent(event: dict) -> None:
-    for connection in active_connections:
-        await connection.send_json(event)
+    dead_connections = []
+    for connection in active_connections[:]:
+        try:
+            await connection.send_json(event)
+        except Exception:
+            dead_connections.append(connection)
+    for conn in dead_connections:
+        if conn in active_connections:
+            active_connections.remove(conn)

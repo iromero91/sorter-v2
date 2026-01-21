@@ -24,15 +24,19 @@ def runServer() -> None:
 
 
 def runBroadcaster(gc: GlobalConfig) -> None:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    import server.api as api
+
+    while api.server_loop is None:
+        time.sleep(0.01)
 
     while True:
         try:
             command = main_to_server_queue.get(block=False)
             if command.tag != "frame":
                 gc.logger.info(f"broadcasting {command.tag} event")
-            loop.run_until_complete(broadcastEvent(command.model_dump()))
+            asyncio.run_coroutine_threadsafe(
+                broadcastEvent(command.model_dump()), api.server_loop
+            )
         except queue.Empty:
             pass
 
