@@ -28,7 +28,13 @@ class Chute:
         self.logger = gc.logger
         self.stepper = stepper
         self.layout = layout
-        self.current_angle: float = 0.0
+
+    @property
+    def current_angle(self) -> float:
+        stepper_angle = (
+            self.stepper.current_position_steps / self.stepper.total_steps_per_rev
+        ) * 360.0
+        return (stepper_angle / GEAR_RATIO) % 360
 
     def getAngleForBin(self, address: BinAddress) -> float:
         layer = self.layout.layers[address.layer_index]
@@ -40,18 +46,17 @@ class Chute:
         return section_start + bin_offset
 
     def moveToAngle(self, target: float) -> None:
-        delta = target - self.current_angle
-        if delta > 180:
-            delta -= 360
-        elif delta < -180:
-            delta += 360
-
-        stepper_deg = delta * GEAR_RATIO
-        self.logger.info(
-            f"Chute: moving from {self.current_angle:.1f}° to {target:.1f}° (delta={delta:.1f}°)"
+        current = self.current_angle
+        delta_angle = target - current
+        delta_stepper_deg = delta_angle * GEAR_RATIO
+        delta_steps = round(
+            (delta_stepper_deg / 360.0) * self.stepper.total_steps_per_rev
         )
-        self.stepper.rotate(stepper_deg)
-        self.current_angle = target
+
+        self.logger.info(
+            f"Chute: moving from {current:.1f}° to {target:.1f}° ({delta_steps} steps)"
+        )
+        self.stepper.moveSteps(delta_steps)
 
     def moveToBin(self, address: BinAddress) -> None:
         target = self.getAngleForBin(address)
@@ -59,4 +64,4 @@ class Chute:
 
     def home(self) -> None:
         self.logger.info("Chute: homing (stub)")
-        self.current_angle = 0.0
+        self.stepper.current_position_steps = 0

@@ -93,7 +93,6 @@ def main():
             elif key.lower() == "z":
                 stepper.current_position_steps = 0
                 setStepperPosition(stepper.name, 0)
-                chute.current_angle = 0.0
                 printStatus()
                 print("Zeroed stepper and chute angle")
             elif key == "\t":
@@ -130,7 +129,6 @@ def main():
             elif key.lower() == "z":
                 stepper.current_position_steps = 0
                 setStepperPosition(stepper.name, 0)
-                chute.current_angle = 0.0
                 printStatus()
                 print("Zeroed stepper and chute angle")
             elif key == "\t":
