@@ -10,6 +10,7 @@ from .bin_layout import DistributionLayout
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 from sorting_profile import SortingProfile
+import queue
 
 
 class DistributionStateMachine(BaseSubsystem):
@@ -20,6 +21,7 @@ class DistributionStateMachine(BaseSubsystem):
         shared: SharedVariables,
         sorting_profile: SortingProfile,
         layout: DistributionLayout,
+        event_queue: queue.Queue,
     ):
         super().__init__()
         self.irl = irl
@@ -28,15 +30,18 @@ class DistributionStateMachine(BaseSubsystem):
         self.shared = shared
         self.sorting_profile = sorting_profile
         self.layout = layout
+        self.event_queue = event_queue
         self.chute = Chute(gc, irl.chute_stepper, layout)
         self.current_state = DistributionState.IDLE
         self.states_map = {
             DistributionState.IDLE: Idle(irl, gc, shared),
             DistributionState.POSITIONING: Positioning(
-                irl, gc, shared, self.chute, layout, sorting_profile
+                irl, gc, shared, self.chute, layout, sorting_profile, event_queue
             ),
             DistributionState.READY: Ready(irl, gc, shared),
-            DistributionState.SENDING: Sending(irl, gc, shared, sorting_profile),
+            DistributionState.SENDING: Sending(
+                irl, gc, shared, sorting_profile, event_queue
+            ),
         }
 
     def step(self) -> None:

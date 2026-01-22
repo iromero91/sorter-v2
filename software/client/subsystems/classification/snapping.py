@@ -1,6 +1,8 @@
 from typing import Optional, TYPE_CHECKING
 import os
 import time
+import base64
+import queue
 import cv2
 from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
@@ -8,6 +10,7 @@ from .states import ClassificationState
 from .carousel import Carousel, CLASSIFICATION_POSITION
 from irl.config import IRLInterface
 from global_config import GlobalConfig
+from defs.events import KnownObjectEvent, KnownObjectData, KnownObjectStatus
 import classification
 
 if TYPE_CHECKING:
@@ -25,11 +28,13 @@ class Snapping(BaseState):
         shared: SharedVariables,
         carousel: Carousel,
         vision: "VisionManager",
+        event_queue: queue.Queue,
     ):
         super().__init__(irl, gc)
         self.shared = shared
         self.carousel = carousel
         self.vision = vision
+        self.event_queue = event_queue
         self.start_time: Optional[float] = None
         self.snapped = False
 
@@ -49,6 +54,25 @@ class Snapping(BaseState):
 
         self.shared.classification_ready = True
         return ClassificationState.IDLE
+
+    def _emitObjectEvent(self, obj) -> None:
+        event = KnownObjectEvent(
+            tag="known_object",
+            data=KnownObjectData(
+                uuid=obj.uuid,
+                created_at=obj.created_at,
+                updated_at=obj.updated_at,
+                status=KnownObjectStatus(obj.status),
+                part_id=obj.part_id,
+                category_id=obj.category_id,
+                confidence=obj.confidence,
+                destination_bin=obj.destination_bin,
+                thumbnail=obj.thumbnail,
+                top_image=obj.top_image,
+                bottom_image=obj.bottom_image,
+            ),
+        )
+        self.event_queue.put(event)
 
     def _captureAndClassify(self) -> None:
         piece = self.carousel.getPieceAtClassification()
@@ -83,10 +107,44 @@ class Snapping(BaseState):
         )
         self.logger.info(f"Snapping: saved {piece.uuid[:8]} to {SNAP_DIR}")
 
+        _, thumbnail_buffer = cv2.imencode(
+            ".jpg", top_crop, [cv2.IMWRITE_JPEG_QUALITY, 80]
+        )
+        piece.thumbnail = base64.b64encode(thumbnail_buffer).decode("utf-8")
+
+        if top_frame:
+            top_img = (
+                top_frame.annotated
+                if top_frame.annotated is not None
+                else top_frame.raw
+            )
+            _, top_buffer = cv2.imencode(
+                ".jpg", top_img, [cv2.IMWRITE_JPEG_QUALITY, 80]
+            )
+            piece.top_image = base64.b64encode(top_buffer).decode("utf-8")
+        if bottom_frame:
+            bottom_img = (
+                bottom_frame.annotated
+                if bottom_frame.annotated is not None
+                else bottom_frame.raw
+            )
+            _, bottom_buffer = cv2.imencode(
+                ".jpg", bottom_img, [cv2.IMWRITE_JPEG_QUALITY, 80]
+            )
+            piece.bottom_image = base64.b64encode(bottom_buffer).decode("utf-8")
+
+        piece.status = "classifying"
+        piece.updated_at = time.time()
+        self._emitObjectEvent(piece)
+
         self.carousel.markPendingClassification(piece)
 
-        def onResult(part_id: Optional[str]) -> None:
-            self.carousel.resolveClassification(piece.uuid, part_id or "unknown")
+        def onResult(
+            part_id: Optional[str], confidence: Optional[float] = None
+        ) -> None:
+            self.carousel.resolveClassification(
+                piece.uuid, part_id or "unknown", confidence
+            )
             self.logger.info(f"Snapping: classified {piece.uuid[:8]} -> {part_id}")
 
         classification.classify(self.gc, top_crop, bottom_crop, onResult)

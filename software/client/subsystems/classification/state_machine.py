@@ -9,6 +9,7 @@ from .carousel import Carousel
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 from vision import VisionManager
+import queue
 
 
 class ClassificationStateMachine(BaseSubsystem):
@@ -18,6 +19,7 @@ class ClassificationStateMachine(BaseSubsystem):
         gc: GlobalConfig,
         shared: SharedVariables,
         vision: VisionManager,
+        event_queue: queue.Queue,
     ):
         super().__init__()
         self.irl = irl
@@ -25,7 +27,8 @@ class ClassificationStateMachine(BaseSubsystem):
         self.logger = gc.logger
         self.shared = shared
         self.vision = vision
-        self.carousel = Carousel(gc.logger)
+        self.event_queue = event_queue
+        self.carousel = Carousel(gc.logger, event_queue)
         self.current_state = ClassificationState.IDLE
 
         self.states_map = {
@@ -34,10 +37,10 @@ class ClassificationStateMachine(BaseSubsystem):
                 irl, gc, shared, self.carousel, vision
             ),
             ClassificationState.ROTATING: Rotating(
-                irl, gc, shared, self.carousel, irl.carousel_stepper
+                irl, gc, shared, self.carousel, irl.carousel_stepper, event_queue
             ),
             ClassificationState.SNAPPING: Snapping(
-                irl, gc, shared, self.carousel, vision
+                irl, gc, shared, self.carousel, vision, event_queue
             ),
         }
 

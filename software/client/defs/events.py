@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal, Union, Optional, Tuple
+from typing import Literal, Union, Optional, Tuple, List
 from enum import Enum
 
 
@@ -7,6 +7,14 @@ class CameraName(str, Enum):
     feeder = "feeder"
     classification_bottom = "classification_bottom"
     classification_top = "classification_top"
+
+
+class KnownObjectStatus(str, Enum):
+    created = "created"
+    classifying = "classifying"
+    classified = "classified"
+    distributing = "distributing"
+    distributed = "distributed"
 
 
 class HeartbeatData(BaseModel):
@@ -48,6 +56,47 @@ class IdentityEvent(BaseModel):
     data: MachineIdentityData
 
 
-SocketEvent = Union[HeartbeatEvent, FrameEvent, IdentityEvent]
-MainThreadToServerCommand = Union[HeartbeatEvent, FrameEvent]
+class KnownObjectData(BaseModel):
+    uuid: str
+    created_at: float
+    updated_at: float
+    status: KnownObjectStatus
+    part_id: Optional[str] = None
+    category_id: Optional[str] = None
+    confidence: Optional[float] = None
+    destination_bin: Optional[Tuple[int, int, int]] = None
+    thumbnail: Optional[str] = None
+    top_image: Optional[str] = None
+    bottom_image: Optional[str] = None
+
+
+class KnownObjectEvent(BaseModel):
+    tag: Literal["known_object"]
+    data: KnownObjectData
+
+
+class BinData(BaseModel):
+    size: str
+    category_id: Optional[str] = None
+
+
+class LayerData(BaseModel):
+    sections: List[List[BinData]]
+
+
+class DistributionLayoutData(BaseModel):
+    layers: List[LayerData]
+
+
+class DistributionLayoutEvent(BaseModel):
+    tag: Literal["distribution_layout"]
+    data: DistributionLayoutData
+
+
+SocketEvent = Union[
+    HeartbeatEvent, FrameEvent, IdentityEvent, KnownObjectEvent, DistributionLayoutEvent
+]
+MainThreadToServerCommand = Union[
+    HeartbeatEvent, FrameEvent, KnownObjectEvent, DistributionLayoutEvent
+]
 ServerToMainThreadEvent = Union[HeartbeatEvent]

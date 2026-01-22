@@ -6,7 +6,27 @@
 */
 
 export type CameraName = 'feeder' | 'classification_bottom' | 'classification_top';
+export type KnownObjectStatus =
+	| 'created'
+	| 'classifying'
+	| 'classified'
+	| 'distributing'
+	| 'distributed';
 
+export interface BinData {
+	size: string;
+	category_id?: string | null;
+}
+export interface DistributionLayoutData {
+	layers: LayerData[];
+}
+export interface LayerData {
+	sections: BinData[][];
+}
+export interface DistributionLayoutEvent {
+	tag: 'distribution_layout';
+	data: DistributionLayoutData;
+}
 export interface FrameData {
 	camera: CameraName;
 	timestamp: number;
@@ -39,5 +59,27 @@ export interface MachineIdentityData {
 	machine_id: string;
 	nickname: string | null;
 }
+export interface KnownObjectData {
+	uuid: string;
+	created_at: number;
+	updated_at: number;
+	status: KnownObjectStatus;
+	part_id?: string | null;
+	category_id?: string | null;
+	confidence?: number | null;
+	destination_bin?: [unknown, unknown, unknown] | null;
+	thumbnail?: string | null;
+	top_image?: string | null;
+	bottom_image?: string | null;
+}
+export interface KnownObjectEvent {
+	tag: 'known_object';
+	data: KnownObjectData;
+}
 
-export type SocketEvent = HeartbeatEvent | FrameEvent | IdentityEvent;
+export type SocketEvent =
+	| HeartbeatEvent
+	| FrameEvent
+	| IdentityEvent
+	| KnownObjectEvent
+	| DistributionLayoutEvent;

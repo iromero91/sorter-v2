@@ -1,7 +1,9 @@
 from typing import Optional, Dict, List
 import time
 import logging
+import queue
 from .known_object import KnownObject
+from defs.events import KnownObjectEvent, KnownObjectData, KnownObjectStatus
 
 NUM_PLATFORMS = 4
 FEEDER_POSITION = 0
@@ -11,10 +13,15 @@ EXIT_POSITION = 3
 
 
 class Carousel:
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(
+        self,
+        logger: Optional[logging.Logger] = None,
+        event_queue: Optional[queue.Queue] = None,
+    ):
         self.platforms: List[Optional[KnownObject]] = [None] * NUM_PLATFORMS
         self.pending_classifications: Dict[str, KnownObject] = {}
         self.logger = logger
+        self.event_queue = event_queue
 
     def _log(self, msg: str) -> None:
         if self.logger:
@@ -25,10 +32,32 @@ class Carousel:
             "[" + ", ".join(p.uuid[:8] if p else "empty" for p in self.platforms) + "]"
         )
 
+    def _emitObjectEvent(self, obj: KnownObject) -> None:
+        if self.event_queue is None:
+            return
+        event = KnownObjectEvent(
+            tag="known_object",
+            data=KnownObjectData(
+                uuid=obj.uuid,
+                created_at=obj.created_at,
+                updated_at=obj.updated_at,
+                status=KnownObjectStatus(obj.status),
+                part_id=obj.part_id,
+                category_id=obj.category_id,
+                confidence=obj.confidence,
+                destination_bin=obj.destination_bin,
+                thumbnail=obj.thumbnail,
+                top_image=obj.top_image,
+                bottom_image=obj.bottom_image,
+            ),
+        )
+        self.event_queue.put(event)
+
     def addPieceAtFeeder(self) -> KnownObject:
         obj = KnownObject()
         self.platforms[FEEDER_POSITION] = obj
         self._log(f"added piece {obj.uuid[:8]} at feeder -> {self._platformSummary()}")
+        self._emitObjectEvent(obj)
         return obj
 
     def rotate(self) -> Optional[KnownObject]:
@@ -53,15 +82,20 @@ class Carousel:
             f"marked {obj.uuid[:8]} pending, {len(self.pending_classifications)} in flight"
         )
 
-    def resolveClassification(self, uuid: str, part_id: str) -> None:
+    def resolveClassification(
+        self, uuid: str, part_id: str, confidence: Optional[float] = None
+    ) -> None:
         if uuid in self.pending_classifications:
             obj = self.pending_classifications[uuid]
             obj.part_id = part_id
+            obj.confidence = confidence
+            obj.status = "classified"
             obj.updated_at = time.time()
             del self.pending_classifications[uuid]
             self._log(
                 f"resolved {uuid[:8]} -> {part_id}, {len(self.pending_classifications)} in flight"
             )
+            self._emitObjectEvent(obj)
 
     def hasPieceAtFeeder(self) -> bool:
         return self.platforms[FEEDER_POSITION] is not None

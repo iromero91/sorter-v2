@@ -56,7 +56,7 @@ def main() -> None:
     chute.home()
 
     vision = VisionManager(irl_config, gc)
-    controller = SorterController(irl, gc, vision)
+    controller = SorterController(irl, gc, vision, main_to_server_queue)
     gc.logger.info("client starting...")
 
     vision.start()

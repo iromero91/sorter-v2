@@ -1,11 +1,29 @@
-import type { SocketEvent, CameraName, FrameData } from '$lib/api/events';
+import type {
+	SocketEvent,
+	CameraName,
+	FrameData,
+	KnownObjectData,
+	DistributionLayoutData
+} from '$lib/api/events';
 import type { MachineState, MachineIdentity } from './types';
-import { isIdentityEvent, isFrameEvent, isHeartbeatEvent } from './types';
+import {
+	isIdentityEvent,
+	isFrameEvent,
+	isHeartbeatEvent,
+	isKnownObjectEvent,
+	isDistributionLayoutEvent
+} from './types';
+
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30000;
 
 export class MachineManager {
 	machines = $state(new Map<string, MachineState>());
 	selectedMachineId = $state<string | null>(null);
 	private pending_connections = new Map<WebSocket, string>();
+	private reconnect_attempts = new Map<string, number>();
+	private reconnect_timers = new Map<string, ReturnType<typeof setTimeout>>();
+	private manually_disconnected = new Set<string>();
 
 	selectedMachine = $derived.by(() => {
 		if (!this.selectedMachineId) return null;
@@ -13,11 +31,20 @@ export class MachineManager {
 	});
 
 	connect(url: string): void {
+		this.manually_disconnected.delete(url);
+
+		const existing_timer = this.reconnect_timers.get(url);
+		if (existing_timer) {
+			clearTimeout(existing_timer);
+			this.reconnect_timers.delete(url);
+		}
+
 		const ws = new WebSocket(url);
 		this.pending_connections.set(ws, url);
 
 		ws.onopen = () => {
 			console.log(`[MachineManager] Connected to ${url}`);
+			this.reconnect_attempts.set(url, 0);
 		};
 
 		ws.onmessage = (message) => {
@@ -30,7 +57,8 @@ export class MachineManager {
 		};
 
 		ws.onclose = () => {
-			console.log(`[MachineManager] WebSocket closed`);
+			console.log(`[MachineManager] WebSocket closed for ${url}`);
+			const closed_url = this.pending_connections.get(ws);
 			this.pending_connections.delete(ws);
 
 			for (const [id, machine] of this.machines) {
@@ -44,12 +72,44 @@ export class MachineManager {
 					break;
 				}
 			}
+
+			const reconnect_url = closed_url ?? url;
+			if (!this.manually_disconnected.has(reconnect_url)) {
+				this.scheduleReconnect(reconnect_url);
+			}
 		};
+	}
+
+	private scheduleReconnect(url: string): void {
+		const attempts = this.reconnect_attempts.get(url) ?? 0;
+		const delay = Math.min(RECONNECT_BASE_DELAY_MS * Math.pow(2, attempts), RECONNECT_MAX_DELAY_MS);
+
+		console.log(
+			`[MachineManager] Scheduling reconnect to ${url} in ${delay}ms (attempt ${attempts + 1})`
+		);
+
+		const timer = setTimeout(() => {
+			this.reconnect_timers.delete(url);
+			this.reconnect_attempts.set(url, attempts + 1);
+			this.connect(url);
+		}, delay);
+
+		this.reconnect_timers.set(url, timer);
 	}
 
 	disconnect(machineId: string): void {
 		const machine = this.machines.get(machineId);
 		if (machine) {
+			const url = this.findUrlBySocket(machine.connection);
+			if (url) {
+				this.manually_disconnected.add(url);
+				const timer = this.reconnect_timers.get(url);
+				if (timer) {
+					clearTimeout(timer);
+					this.reconnect_timers.delete(url);
+				}
+			}
+
 			machine.connection.close();
 			const updated = new Map(this.machines);
 			updated.delete(machineId);
@@ -62,6 +122,13 @@ export class MachineManager {
 
 	selectMachine(machineId: string | null): void {
 		this.selectedMachineId = machineId;
+	}
+
+	private findUrlBySocket(ws: WebSocket): string | null {
+		for (const [socket, url] of this.pending_connections) {
+			if (socket === ws) return url;
+		}
+		return null;
 	}
 
 	private handleEvent(ws: WebSocket, event: SocketEvent): void {
@@ -78,15 +145,20 @@ export class MachineManager {
 				this.handleFrame(machineId, event.data);
 			} else if (isHeartbeatEvent(event)) {
 				this.handleHeartbeat(machineId, event.data.timestamp);
+			} else if (isKnownObjectEvent(event)) {
+				this.handleKnownObject(machineId, event.data);
+			} else if (isDistributionLayoutEvent(event)) {
+				this.handleLayout(machineId, event.data);
 			}
 		}
 	}
 
 	private handleIdentity(ws: WebSocket, identity: MachineIdentity): void {
+		const url = this.pending_connections.get(ws);
 		this.pending_connections.delete(ws);
 
 		const existing = this.machines.get(identity.machine_id);
-		if (existing) {
+		if (existing && existing.connection !== ws) {
 			existing.connection.close();
 		}
 
@@ -95,10 +167,16 @@ export class MachineManager {
 			identity,
 			connection: ws,
 			status: 'connected',
-			frames: new Map(),
-			lastHeartbeat: null
+			frames: existing?.frames ?? new Map(),
+			lastHeartbeat: null,
+			recentObjects: existing?.recentObjects ?? [],
+			layout: existing?.layout ?? null
 		});
 		this.machines = updated;
+
+		if (url) {
+			this.pending_connections.set(ws, url);
+		}
 
 		if (!this.selectedMachineId) {
 			this.selectedMachineId = identity.machine_id;
@@ -125,6 +203,34 @@ export class MachineManager {
 
 		const updated = new Map(this.machines);
 		updated.set(machineId, { ...machine, lastHeartbeat: timestamp });
+		this.machines = updated;
+	}
+
+	private handleKnownObject(machineId: string, obj: KnownObjectData): void {
+		const machine = this.machines.get(machineId);
+		if (!machine) return;
+
+		const existing_idx = machine.recentObjects.findIndex((o) => o.uuid === obj.uuid);
+		let updated_objects: KnownObjectData[];
+
+		if (existing_idx >= 0) {
+			updated_objects = [...machine.recentObjects];
+			updated_objects[existing_idx] = obj;
+		} else {
+			updated_objects = [obj, ...machine.recentObjects].slice(0, 10);
+		}
+
+		const updated = new Map(this.machines);
+		updated.set(machineId, { ...machine, recentObjects: updated_objects });
+		this.machines = updated;
+	}
+
+	private handleLayout(machineId: string, layout: DistributionLayoutData): void {
+		const machine = this.machines.get(machineId);
+		if (!machine) return;
+
+		const updated = new Map(this.machines);
+		updated.set(machineId, { ...machine, layout });
 		this.machines = updated;
 	}
 
