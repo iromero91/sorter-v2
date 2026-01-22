@@ -47,14 +47,14 @@ class Chute:
 
     def moveToAngle(self, target: float) -> None:
         current = self.current_angle
-        delta_angle = target - current
-        delta_stepper_deg = delta_angle * GEAR_RATIO
-        delta_steps = round(
-            (delta_stepper_deg / 360.0) * self.stepper.total_steps_per_rev
+        target_stepper_angle = target * GEAR_RATIO
+        target_steps = round(
+            (target_stepper_angle / 360.0) * self.stepper.total_steps_per_rev
         )
+        delta_steps = target_steps - self.stepper.current_position_steps
 
         self.logger.info(
-            f"Chute: moving from {current:.1f}° to {target:.1f}° ({delta_steps} steps)"
+            f"Chute: moving from {current:.1f}° to {target:.1f}° (target={target_steps} steps, delta={delta_steps})"
         )
         self.stepper.moveSteps(delta_steps)
 
@@ -63,5 +63,5 @@ class Chute:
         self.moveToAngle(target)
 
     def home(self) -> None:
-        self.logger.info("Chute: homing (stub)")
-        self.stepper.current_position_steps = 0
+        self.logger.info("Chute: homing to zero")
+        self.moveToAngle(0.0)

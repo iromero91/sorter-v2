@@ -21,6 +21,7 @@ class Stepper:
         name: str,
         steps_per_rev: int = STEPS_PER_REV,
         microstepping: int = DEFAULT_MICROSTEPPING,
+        default_delay_us: int = BASE_DELAY_US,
     ):
         self.gc = gc
         self.mcu = mcu
@@ -30,6 +31,7 @@ class Stepper:
         self.name = name
         self.steps_per_rev = steps_per_rev
         self.microstepping = microstepping
+        self.default_delay_us = default_delay_us
         self.total_steps_per_rev = steps_per_rev * microstepping
         self.current_position_steps = getStepperPosition(name)
 
@@ -43,9 +45,10 @@ class Stepper:
         mcu.command("P", enable_pin, 1)
         mcu.command("D", enable_pin, 0)
 
-    def rotate(self, deg: float, speed: float = 1.0) -> None:
+    def rotate(self, deg: float, delay_us: int | None = None) -> None:
+        if delay_us is None:
+            delay_us = self.default_delay_us
         steps = int((deg / 360.0) * self.total_steps_per_rev)
-        delay_us = int(BASE_DELAY_US / max(0.1, speed))
         self.gc.logger.info(
             f"Stepper '{self.name}' rotating {deg}° ({steps} steps, delay={delay_us}us)"
         )
@@ -53,8 +56,9 @@ class Stepper:
         self.current_position_steps += steps
         setStepperPosition(self.name, self.current_position_steps)
 
-    def moveSteps(self, steps: int, speed: float = 1.0) -> None:
-        delay_us = int(BASE_DELAY_US / max(0.1, speed))
+    def moveSteps(self, steps: int, delay_us: int | None = None) -> None:
+        if delay_us is None:
+            delay_us = self.default_delay_us
         self.mcu.command("T", self.step_pin, self.dir_pin, steps, delay_us)
         self.current_position_steps += steps
         setStepperPosition(self.name, self.current_position_steps)

@@ -5,6 +5,8 @@ from message_queue.handler import handleServerToMainEvent
 from defs.events import HeartbeatEvent, HeartbeatData, MainThreadToServerCommand
 from irl.config import mkIRLConfig, mkIRLInterface
 from vision import VisionManager
+from subsystems.distribution.bin_layout import mkDefaultLayout
+from subsystems.distribution.chute import Chute
 import uvicorn
 import threading
 import queue
@@ -47,6 +49,12 @@ def main() -> None:
     gc = mkGlobalConfig()
     irl_config = mkIRLConfig()
     irl = mkIRLInterface(irl_config, gc)
+
+    layout = mkDefaultLayout()
+    chute = Chute(gc, irl.chute_stepper, layout)
+    gc.logger.info("Homing chute to zero...")
+    chute.home()
+
     vision = VisionManager(irl_config, gc)
     controller = SorterController(irl, gc, vision)
     gc.logger.info("client starting...")
