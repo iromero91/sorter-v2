@@ -7,3 +7,5 @@ requests
 pillow
 numpy
 opencv-python
+pyserial
+simple-term-menu

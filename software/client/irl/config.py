@@ -2,6 +2,7 @@ from global_config import GlobalConfig
 from .dc_motor import DCMotor
 from .mcu import MCU
 from .stepper import Stepper
+from .device_discovery import discoverMCUs
 
 
 class CameraConfig:
@@ -109,8 +110,7 @@ def mkStepperConfig(step_pin: int, dir_pin: int, enable_pin: int) -> StepperConf
 
 def mkIRLConfig() -> IRLConfig:
     irl_config = IRLConfig()
-    irl_config.mcu_path = "/dev/cu.usbserial-11420"
-    irl_config.second_mcu_path = "/dev/cu.usbmodem1141401"
+    irl_config.mcu_path, irl_config.second_mcu_path = discoverMCUs()
     irl_config.feeder_camera = mkCameraConfig(device_index=0)
     irl_config.classification_camera_bottom = mkCameraConfig(device_index=2)
     irl_config.classification_camera_top = mkCameraConfig(device_index=1)

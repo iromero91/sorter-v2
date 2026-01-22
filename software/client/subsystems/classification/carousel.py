@@ -6,6 +6,7 @@ from .known_object import KnownObject
 NUM_PLATFORMS = 4
 FEEDER_POSITION = 0
 CLASSIFICATION_POSITION = 1
+INTERMEDIATE_POSITION = 2
 EXIT_POSITION = 3
 
 
@@ -39,6 +40,9 @@ class Carousel:
 
     def getPieceAtClassification(self) -> Optional[KnownObject]:
         return self.platforms[CLASSIFICATION_POSITION]
+
+    def getPieceAtIntermediate(self) -> Optional[KnownObject]:
+        return self.platforms[INTERMEDIATE_POSITION]
 
     def getPieceAtExit(self) -> Optional[KnownObject]:
         return self.platforms[EXIT_POSITION]

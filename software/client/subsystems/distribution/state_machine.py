@@ -2,7 +2,11 @@ from subsystems.base_subsystem import BaseSubsystem
 from subsystems.shared_variables import SharedVariables
 from .states import DistributionState
 from .idle import Idle
+from .positioning import Positioning
+from .ready import Ready
 from .sending import Sending
+from .chute import Chute
+from .bin_layout import DistributionLayout
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 from sorting_profile import SortingProfile
@@ -15,6 +19,7 @@ class DistributionStateMachine(BaseSubsystem):
         gc: GlobalConfig,
         shared: SharedVariables,
         sorting_profile: SortingProfile,
+        layout: DistributionLayout,
     ):
         super().__init__()
         self.irl = irl
@@ -22,9 +27,15 @@ class DistributionStateMachine(BaseSubsystem):
         self.logger = gc.logger
         self.shared = shared
         self.sorting_profile = sorting_profile
+        self.layout = layout
+        self.chute = Chute(gc, irl.chute_stepper, layout)
         self.current_state = DistributionState.IDLE
         self.states_map = {
             DistributionState.IDLE: Idle(irl, gc, shared),
+            DistributionState.POSITIONING: Positioning(
+                irl, gc, shared, self.chute, layout, sorting_profile
+            ),
+            DistributionState.READY: Ready(irl, gc, shared),
             DistributionState.SENDING: Sending(irl, gc, shared, sorting_profile),
         }
 

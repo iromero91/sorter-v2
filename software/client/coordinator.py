@@ -3,6 +3,7 @@ from subsystems import (
     FeederStateMachine,
     ClassificationStateMachine,
     DistributionStateMachine,
+    mkDefaultLayout,
 )
 from irl.config import IRLInterface
 from global_config import GlobalConfig
@@ -18,9 +19,10 @@ class Coordinator:
         self.vision = vision
         self.shared = SharedVariables()
         self.sorting_profile = SortingProfile()
+        self.distribution_layout = mkDefaultLayout()
 
         self.distribution = DistributionStateMachine(
-            irl, gc, self.shared, self.sorting_profile
+            irl, gc, self.shared, self.sorting_profile, self.distribution_layout
         )
         self.classification = ClassificationStateMachine(irl, gc, self.shared, vision)
         self.feeder = FeederStateMachine(irl, gc, self.shared)

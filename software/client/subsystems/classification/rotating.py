@@ -30,6 +30,9 @@ class Rotating(BaseState):
         self.command_sent = False
 
     def step(self) -> Optional[ClassificationState]:
+        if not self.shared.distribution_ready:
+            return None
+
         if self.start_time is None:
             self.start_time = time.time()
             self.logger.info("Rotating: starting rotation")
@@ -43,16 +46,17 @@ class Rotating(BaseState):
         self.logger.info("Rotating: rotation complete")
         exiting = self.carousel.rotate()
         if exiting:
-            if exiting.part_id is not None:
-                self.logger.info(
-                    f"Rotating: handing off {exiting.uuid[:8]} ({exiting.part_id}) to distribution"
-                )
-                self.shared.distribution_ready = False
-                self.shared.exiting_piece = exiting
-            else:
-                self.logger.info(
-                    f"Rotating: piece {exiting.uuid[:8]} exited without classification"
-                )
+            self.logger.info(f"Rotating: piece {exiting.uuid[:8]} exited carousel")
+
+        piece_at_exit = self.carousel.getPieceAtExit()
+        if piece_at_exit and piece_at_exit.part_id is not None:
+            self.logger.info(
+                f"Rotating: piece {piece_at_exit.uuid[:8]} ({piece_at_exit.part_id}) now at exit, queueing for distribution"
+            )
+            self.shared.distribution_ready = False
+            self.shared.pending_piece = piece_at_exit
+        else:
+            self.shared.pending_piece = None
 
         piece_at_class = self.carousel.getPieceAtClassification()
         if piece_at_class is not None:

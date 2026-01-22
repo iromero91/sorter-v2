@@ -1,11 +1,10 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import List, Optional
-from pathlib import Path
 import asyncio
-import uuid
 
 from defs.events import IdentityEvent, MachineIdentityData
+from blob_manager import getMachineId
 
 app = FastAPI(title="Sorter API", version="0.0.1")
 
@@ -17,17 +16,6 @@ server_loop: Optional[asyncio.AbstractEventLoop] = None
 async def onStartup() -> None:
     global server_loop
     server_loop = asyncio.get_running_loop()
-
-
-MACHINE_ID_FILE = Path.home() / ".sorter_machine_id"
-
-
-def getMachineId() -> str:
-    if MACHINE_ID_FILE.exists():
-        return MACHINE_ID_FILE.read_text().strip()
-    machine_id = str(uuid.uuid4())
-    MACHINE_ID_FILE.write_text(machine_id)
-    return machine_id
 
 
 MACHINE_ID = getMachineId()
