@@ -1,5 +1,6 @@
 from subsystems.base_subsystem import BaseSubsystem
 from subsystems.shared_variables import SharedVariables
+from runtime_variables import RuntimeVariables
 from .states import FeederState
 from .idle import Idle
 from .feeding import Feeding
@@ -18,6 +19,7 @@ class FeederStateMachine(BaseSubsystem):
         gc: GlobalConfig,
         shared: SharedVariables,
         vision: VisionManager,
+        rv: RuntimeVariables,
     ):
         super().__init__()
         self.irl = irl
@@ -29,9 +31,9 @@ class FeederStateMachine(BaseSubsystem):
         self.states_map = {
             FeederState.IDLE: Idle(irl, gc, shared, vision),
             FeederState.FEEDING: Feeding(irl, gc, shared),
-            FeederState.V3_DISPENSING: V3Dispensing(irl, gc, shared, vision),
-            FeederState.V2_LOADING: V2Loading(irl, gc, shared, vision),
-            FeederState.V1_LOADING: V1Loading(irl, gc, shared, vision),
+            FeederState.V3_DISPENSING: V3Dispensing(irl, gc, shared, vision, rv),
+            FeederState.V2_LOADING: V2Loading(irl, gc, shared, vision, rv),
+            FeederState.V1_LOADING: V1Loading(irl, gc, shared, vision, rv),
         }
 
     def step(self) -> None:

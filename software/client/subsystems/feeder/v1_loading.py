@@ -2,6 +2,7 @@ import time
 from typing import Optional
 from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
+from runtime_variables import RuntimeVariables
 from .states import (
     FeederState,
     OBJECT_CLASS_ID,
@@ -23,11 +24,13 @@ class V1Loading(BaseState):
         gc: GlobalConfig,
         shared: SharedVariables,
         vision: VisionManager,
+        rv: RuntimeVariables,
     ):
         super().__init__(irl, gc)
         self.shared = shared
         self.vision = vision
         self.feeder_config = gc.feeder_config
+        self.rv = rv
 
     def step(self) -> Optional[FeederState]:
         self._ensureExecutionThreadStarted()
@@ -91,15 +94,15 @@ class V1Loading(BaseState):
 
     def cleanup(self) -> None:
         super().cleanup()
-        self.irl.first_v_channel_dc_motor.backstop(self.feeder_config.v1_pulse_speed)
+        self.irl.first_v_channel_dc_motor.backstop(self.rv.get("v1_pulse_speed"))
 
     def _executionLoop(self) -> None:
         motor = self.irl.first_v_channel_dc_motor
-        pulse_ms = self.feeder_config.v1_pulse_length_ms
-        pause_ms = self.feeder_config.pause_ms
-        speed = self.feeder_config.v1_pulse_speed
 
         while not self._stop_event.is_set():
+            pulse_ms = self.rv.get("v1_pulse_length_ms")
+            pause_ms = self.rv.get("pause_ms")
+            speed = self.rv.get("v1_pulse_speed")
             motor.setSpeed(speed)
             time.sleep(pulse_ms / 1000.0)
             motor.backstop(speed)

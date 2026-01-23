@@ -5,13 +5,15 @@
 	import RecentObjects from '$lib/components/RecentObjects.svelte';
 	import BinLayout from '$lib/components/BinLayout.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
+	import RuntimeVariablesModal from '$lib/components/RuntimeVariablesModal.svelte';
 	import MachineDropdown from '$lib/components/MachineDropdown.svelte';
-	import { Settings } from 'lucide-svelte';
+	import { Settings, Wrench } from 'lucide-svelte';
 
 	const manager = getMachinesContext();
 	const machine = getMachineContext();
 
 	let settings_open = $state(false);
+	let runtime_vars_open = $state(false);
 
 	onMount(() => {
 		manager.connect('ws://localhost:8000/ws');
@@ -23,6 +25,13 @@
 		<h1 class="dark:text-text-dark text-2xl font-bold text-text">Sorter</h1>
 		<div class="flex items-center gap-2">
 			<MachineDropdown />
+			<button
+				onclick={() => (runtime_vars_open = true)}
+				class="dark:text-text-dark dark:hover:bg-surface-dark p-2 text-text transition-colors hover:bg-surface"
+				title="Runtime Variables"
+			>
+				<Wrench size={24} />
+			</button>
 			<button
 				onclick={() => (settings_open = true)}
 				class="dark:text-text-dark dark:hover:bg-surface-dark p-2 text-text transition-colors hover:bg-surface"
@@ -64,3 +73,4 @@
 </div>
 
 <SettingsModal bind:open={settings_open} />
+<RuntimeVariablesModal bind:open={runtime_vars_open} />

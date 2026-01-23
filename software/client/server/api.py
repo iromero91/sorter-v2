@@ -1,16 +1,30 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import asyncio
 
 from defs.events import IdentityEvent, MachineIdentityData
 from blob_manager import getMachineId
 from bricklink.api import getPartInfo
+from runtime_variables import RuntimeVariables, VARIABLE_DEFS
 
 app = FastAPI(title="Sorter API", version="0.0.1")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 active_connections: List[WebSocket] = []
 server_loop: Optional[asyncio.AbstractEventLoop] = None
+runtime_vars: Optional[RuntimeVariables] = None
+
+
+def setRuntimeVariables(rv: RuntimeVariables) -> None:
+    global runtime_vars
+    runtime_vars = rv
 
 
 @app.on_event("startup")
@@ -45,7 +59,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        active_connections.remove(websocket)
+        if websocket in active_connections:
+            active_connections.remove(websocket)
 
 
 async def broadcastEvent(event: dict) -> None:
@@ -81,3 +96,38 @@ def getBricklinkPart(part_id: str) -> BricklinkPartResponse:
     if data is None:
         raise HTTPException(status_code=404, detail="Part not found")
     return BricklinkPartResponse(**data)
+
+
+class RuntimeVariableDef(BaseModel):
+    type: str
+    min: float
+    max: float
+    unit: str
+
+
+class RuntimeVariablesResponse(BaseModel):
+    definitions: Dict[str, RuntimeVariableDef]
+    values: Dict[str, Any]
+
+
+class RuntimeVariablesUpdateRequest(BaseModel):
+    values: Dict[str, Any]
+
+
+@app.get("/runtime-variables", response_model=RuntimeVariablesResponse)
+def getRuntimeVariables() -> RuntimeVariablesResponse:
+    if runtime_vars is None:
+        raise HTTPException(status_code=500, detail="Runtime variables not initialized")
+    defs = {k: RuntimeVariableDef(**v) for k, v in VARIABLE_DEFS.items()}
+    return RuntimeVariablesResponse(definitions=defs, values=runtime_vars.getAll())
+
+
+@app.post("/runtime-variables", response_model=RuntimeVariablesResponse)
+def updateRuntimeVariables(
+    req: RuntimeVariablesUpdateRequest,
+) -> RuntimeVariablesResponse:
+    if runtime_vars is None:
+        raise HTTPException(status_code=500, detail="Runtime variables not initialized")
+    runtime_vars.setAll(req.values)
+    defs = {k: RuntimeVariableDef(**v) for k, v in VARIABLE_DEFS.items()}
+    return RuntimeVariablesResponse(definitions=defs, values=runtime_vars.getAll())

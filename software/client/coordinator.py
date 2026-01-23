@@ -9,6 +9,7 @@ from subsystems import (
 )
 from irl.config import IRLInterface
 from global_config import GlobalConfig
+from runtime_variables import RuntimeVariables
 from vision import VisionManager
 from sorting_profile import BrickLinkCategories
 from blob_manager import getBinCategories
@@ -22,6 +23,7 @@ class Coordinator:
         gc: GlobalConfig,
         vision: VisionManager,
         event_queue: queue.Queue,
+        rv: RuntimeVariables,
     ):
         self.irl = irl
         self.gc = gc
@@ -51,7 +53,7 @@ class Coordinator:
         self.classification = ClassificationStateMachine(
             irl, gc, self.shared, vision, event_queue
         )
-        self.feeder = FeederStateMachine(irl, gc, self.shared, vision)
+        self.feeder = FeederStateMachine(irl, gc, self.shared, vision, rv)
 
     def step(self) -> None:
         self.feeder.step()
