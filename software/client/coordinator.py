@@ -51,7 +51,7 @@ class Coordinator:
         self.classification = ClassificationStateMachine(
             irl, gc, self.shared, vision, event_queue
         )
-        self.feeder = FeederStateMachine(irl, gc, self.shared)
+        self.feeder = FeederStateMachine(irl, gc, self.shared, vision)
 
     def step(self) -> None:
         self.feeder.step()
@@ -62,6 +62,3 @@ class Coordinator:
         self.feeder.cleanup()
         self.classification.cleanup()
         self.distribution.cleanup()
-
-    def triggerStart(self) -> None:
-        self.feeder.triggerStart()

@@ -23,7 +23,6 @@ class SorterController:
 
     def start(self) -> None:
         self.state = SorterLifecycle.RUNNING
-        self.coordinator.triggerStart()
 
     def pause(self) -> None:
         self.coordinator.cleanup()

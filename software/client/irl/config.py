@@ -118,7 +118,7 @@ def mkIRLConfig() -> IRLConfig:
         enable_pin=9, input_1_pin=12, input_2_pin=13
     )
     irl_config.second_v_channel_dc_motor = mkDCMotorConfig(
-        enable_pin=10, input_1_pin=14, input_2_pin=15
+        enable_pin=6, input_1_pin=8, input_2_pin=11
     )
     irl_config.third_v_channel_dc_motor = mkDCMotorConfig(
         enable_pin=5, input_1_pin=4, input_2_pin=7

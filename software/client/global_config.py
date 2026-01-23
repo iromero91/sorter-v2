@@ -17,9 +17,30 @@ class DefaultMotorSpeeds:
     third_v_channel: int
 
     def __init__(self):
-        self.first_v_channel = 50
-        self.second_v_channel = -140
-        self.third_v_channel = -140
+        self.first_v_channel = 100
+        self.second_v_channel = 100
+        self.third_v_channel = 100
+
+
+class FeederConfig:
+    pause_ms: float
+    v1_pulse_length_ms: float
+    v1_pulse_speed: int
+    v2_pulse_length_ms: float
+    v2_pulse_speed: int
+    v3_pulse_length_ms: float
+    v3_pulse_speed: int
+    proximity_threshold_px: int
+
+    def __init__(self):
+        self.pause_ms = 200
+        self.v1_pulse_length_ms = 600
+        self.v1_pulse_speed = 20
+        self.v2_pulse_length_ms = 600
+        self.v2_pulse_speed = 20
+        self.v3_pulse_length_ms = 300
+        self.v3_pulse_speed = 20
+        self.proximity_threshold_px = 20
 
 
 class GlobalConfig:
@@ -27,6 +48,7 @@ class GlobalConfig:
     debug_level: int
     timeouts: Timeouts
     default_motor_speeds: DefaultMotorSpeeds
+    feeder_config: FeederConfig
     classification_chamber_vision_model_path: str
     feeder_vision_model_path: str
 
@@ -44,12 +66,18 @@ def mkDefaultMotorSpeeds() -> DefaultMotorSpeeds:
     return motor_speeds
 
 
+def mkFeederConfig() -> FeederConfig:
+    feeder_config = FeederConfig()
+    return feeder_config
+
+
 def mkGlobalConfig() -> GlobalConfig:
     gc = GlobalConfig()
     gc.debug_level = int(os.getenv("DEBUG_LEVEL", "0"))
     gc.logger = Logger(gc.debug_level)
     gc.timeouts = mkTimeouts()
     gc.default_motor_speeds = mkDefaultMotorSpeeds()
+    gc.feeder_config = mkFeederConfig()
     gc.classification_chamber_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/run_1769112999_640_small_100epochs_20batch_data/weights/best.pt"
     gc.feeder_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/run_1769111277_640_small_100epochs_20batch_data/weights/best.pt"
     return gc
