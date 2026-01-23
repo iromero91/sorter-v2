@@ -50,6 +50,6 @@ def mkGlobalConfig() -> GlobalConfig:
     gc.logger = Logger(gc.debug_level)
     gc.timeouts = mkTimeouts()
     gc.default_motor_speeds = mkDefaultMotorSpeeds()
-    gc.classification_chamber_vision_model_path = "/Users/spencer/code/yolo-trainer/checkpoints/run_1768603978_416_small_100epochs_20batch_data/weights/last.pt"
-    gc.feeder_vision_model_path = "/Users/spencer/code/yolo-trainer/checkpoints/run_1769045485_640_small_100epochs_20batch_data/weights/last.pt"
+    gc.classification_chamber_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/run_1769112999_640_small_100epochs_20batch_data/weights/best.pt"
+    gc.feeder_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/run_1769111277_640_small_100epochs_20batch_data/weights/best.pt"
     return gc

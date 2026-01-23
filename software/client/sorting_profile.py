@@ -22,7 +22,7 @@ class BrickLinkCategories(SortingProfile):
             data = json.load(f)
         for part in data["pieces"]:
             part_id = part["id"]
-            category_id = part.get("maybe_bricklink_category_id")
+            category_id = part.get("category_id")
             if category_id is None:
                 continue
             self.part_to_category[part_id] = str(category_id)
