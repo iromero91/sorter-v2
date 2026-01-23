@@ -34,18 +34,22 @@
 	</div>
 
 	{#if machine.machine}
-		<div class="grid grid-cols-[2fr_1fr_1fr] gap-3">
-			<div class="row-span-2">
-				<CameraFeed camera="feeder" />
+		<div class="flex h-[60vh] gap-3">
+			<div class="flex min-w-0 flex-1 gap-3">
+				<div class="flex-1">
+					<CameraFeed camera="feeder" />
+				</div>
+				<div class="flex flex-1 flex-col gap-3">
+					<div class="flex-1">
+						<CameraFeed camera="classification_top" />
+					</div>
+					<div class="flex-1">
+						<CameraFeed camera="classification_bottom" />
+					</div>
+				</div>
 			</div>
-			<div>
-				<CameraFeed camera="classification_top" />
-			</div>
-			<div class="row-span-2">
+			<div class="w-64 flex-shrink-0">
 				<RecentObjects />
-			</div>
-			<div>
-				<CameraFeed camera="classification_bottom" />
 			</div>
 		</div>
 

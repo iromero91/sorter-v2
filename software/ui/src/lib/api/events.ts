@@ -10,6 +10,8 @@ export type KnownObjectStatus =
 	| 'created'
 	| 'classifying'
 	| 'classified'
+	| 'unknown'
+	| 'not_found'
 	| 'distributing'
 	| 'distributed';
 

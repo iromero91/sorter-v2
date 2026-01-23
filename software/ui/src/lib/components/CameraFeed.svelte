@@ -16,8 +16,12 @@
 	});
 </script>
 
-<div class="dark:border-border-dark dark:bg-bg-dark flex flex-col border border-border bg-bg">
-	<div class="dark:bg-surface-dark flex items-center justify-between bg-surface px-2 py-1 text-xs">
+<div
+	class="dark:border-border-dark dark:bg-bg-dark flex h-full flex-col border border-border bg-bg"
+>
+	<div
+		class="dark:bg-surface-dark flex flex-shrink-0 items-center justify-between bg-surface px-2 py-1 text-xs"
+	>
 		<span class="dark:text-text-muted-dark text-text-muted">{camera}</span>
 		<button
 			onclick={() => (show_annotated = !show_annotated)}
@@ -31,9 +35,15 @@
 			{/if}
 		</button>
 	</div>
-	{#if image_src()}
-		<img src={image_src()} alt={camera} class="block max-w-full" />
-	{:else}
-		<div class="dark:text-text-muted-dark p-5 text-center text-text-muted">No frame</div>
-	{/if}
+	<div class="dark:bg-surface-dark relative flex-1 overflow-hidden bg-surface">
+		{#if image_src()}
+			<img src={image_src()} alt={camera} class="absolute inset-0 h-full w-full object-contain" />
+		{:else}
+			<div
+				class="dark:text-text-muted-dark flex h-full items-center justify-center text-text-muted"
+			>
+				No frame
+			</div>
+		{/if}
+	</div>
 </div>

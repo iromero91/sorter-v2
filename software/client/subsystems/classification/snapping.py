@@ -96,9 +96,11 @@ class Snapping(BaseState):
 
         if top_crop is None or bottom_crop is None:
             self.logger.warn(
-                "Snapping: no object detected in classification frames, clearing carousel position"
+                "Snapping: no object detected in classification frames, marking not_found"
             )
-            self.carousel.platforms[CLASSIFICATION_POSITION] = None
+            piece.status = "not_found"
+            piece.updated_at = time.time()
+            self._emitObjectEvent(piece)
             return
 
         cv2.imwrite(os.path.join(SNAP_DIR, f"{piece.uuid}_top_crop.jpg"), top_crop)
@@ -142,9 +144,7 @@ class Snapping(BaseState):
         def onResult(
             part_id: Optional[str], confidence: Optional[float] = None
         ) -> None:
-            self.carousel.resolveClassification(
-                piece.uuid, part_id or "unknown", confidence
-            )
+            self.carousel.resolveClassification(piece.uuid, part_id, confidence)
             self.logger.info(f"Snapping: classified {piece.uuid[:8]} -> {part_id}")
 
         classification.classify(self.gc, top_crop, bottom_crop, onResult)

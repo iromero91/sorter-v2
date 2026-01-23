@@ -83,17 +83,17 @@ class Carousel:
         )
 
     def resolveClassification(
-        self, uuid: str, part_id: str, confidence: Optional[float] = None
+        self, uuid: str, part_id: Optional[str], confidence: Optional[float] = None
     ) -> None:
         if uuid in self.pending_classifications:
             obj = self.pending_classifications[uuid]
             obj.part_id = part_id
             obj.confidence = confidence
-            obj.status = "classified"
+            obj.status = "classified" if part_id else "unknown"
             obj.updated_at = time.time()
             del self.pending_classifications[uuid]
             self._log(
-                f"resolved {uuid[:8]} -> {part_id}, {len(self.pending_classifications)} in flight"
+                f"resolved {uuid[:8]} -> {part_id or 'unknown'}, {len(self.pending_classifications)} in flight"
             )
             self._emitObjectEvent(obj)
 

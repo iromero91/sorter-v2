@@ -13,6 +13,8 @@ class KnownObjectStatus(str, Enum):
     created = "created"
     classifying = "classifying"
     classified = "classified"
+    unknown = "unknown"
+    not_found = "not_found"
     distributing = "distributing"
     distributed = "distributed"
 

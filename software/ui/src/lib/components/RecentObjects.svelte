@@ -4,9 +4,10 @@
 	import type { components } from '$lib/api/rest';
 	import Spinner from './Spinner.svelte';
 	import Badge from './Badge.svelte';
+	import { CircleHelp } from 'lucide-svelte';
 
 	type BricklinkPartResponse = components['schemas']['BricklinkPartResponse'];
-	type BadgeColor = 'gray' | 'yellow' | 'blue' | 'orange' | 'green';
+	type BadgeColor = 'gray' | 'yellow' | 'blue' | 'orange' | 'green' | 'red';
 
 	const ctx = getMachineContext();
 
@@ -49,6 +50,9 @@
 				return 'yellow';
 			case 'classified':
 				return 'blue';
+			case 'unknown':
+			case 'not_found':
+				return 'red';
 			case 'distributing':
 				return 'orange';
 			case 'distributed':
@@ -100,6 +104,10 @@
 									alt="piece"
 									class="h-12 w-12 flex-shrink-0 object-cover"
 								/>
+							{:else if obj.status === 'unknown' || obj.status === 'not_found'}
+								<div class="flex h-12 w-12 flex-shrink-0 items-center justify-center text-red-400">
+									<CircleHelp size={24} />
+								</div>
 							{:else}
 								<div
 									class="dark:bg-surface-dark dark:text-text-muted-dark flex h-12 w-12 flex-shrink-0 items-center justify-center bg-surface"

@@ -82,11 +82,14 @@ class Positioning(BaseState):
         if self.start_time is None:
             self.start_time = time.time()
             piece = self.shared.pending_piece
-            if piece is None or piece.part_id is None:
-                self.logger.warn("Positioning: no pending piece or part_id")
+            if piece is None:
+                self.logger.warn("Positioning: no pending piece")
                 return DistributionState.IDLE
 
-            category_id = self.sorting_profile.getCategoryIdForPart(piece.part_id)
+            if piece.part_id is not None:
+                category_id = self.sorting_profile.getCategoryIdForPart(piece.part_id)
+            else:
+                category_id = MISC_CATEGORY
             result = self._findOrAssignBinForCategory(category_id)
             address, is_new_assignment = result
             if address is None:
