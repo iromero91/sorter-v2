@@ -19,7 +19,7 @@ check:
 	pyright client
 generate:
 	@echo "Starting FastAPI server..."
-	@$(PYTHON) client/main.py & echo $$! > .api.pid
+	@$(PYTHON) client/api_only.py & echo $$! > .api.pid
 	@sleep 2
 	@echo "Generating REST API types..."
 	@cd ui && npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api/rest.ts

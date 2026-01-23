@@ -21,14 +21,72 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/bricklink/part/{part_id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Getbricklinkpart */
+		get: operations['getBricklinkPart_bricklink_part__part_id__get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 }
 export type webhooks = Record<string, never>;
 export interface components {
 	schemas: {
+		/** BricklinkPartResponse */
+		BricklinkPartResponse: {
+			/** No */
+			no: string;
+			/** Name */
+			name: string;
+			/** Type */
+			type: string;
+			/** Category Id */
+			category_id?: number | null;
+			/** Image Url */
+			image_url?: string | null;
+			/** Thumbnail Url */
+			thumbnail_url?: string | null;
+			/** Weight */
+			weight?: string | null;
+			/** Dim X */
+			dim_x?: string | null;
+			/** Dim Y */
+			dim_y?: string | null;
+			/** Dim Z */
+			dim_z?: string | null;
+			/** Year Released */
+			year_released?: number | null;
+			/** Is Obsolete */
+			is_obsolete?: boolean | null;
+		};
+		/** HTTPValidationError */
+		HTTPValidationError: {
+			/** Detail */
+			detail?: components['schemas']['ValidationError'][];
+		};
 		/** HealthResponse */
 		HealthResponse: {
 			/** Status */
 			status: string;
+		};
+		/** ValidationError */
+		ValidationError: {
+			/** Location */
+			loc: (string | number)[];
+			/** Message */
+			msg: string;
+			/** Error Type */
+			type: string;
 		};
 	};
 	responses: never;
@@ -55,6 +113,37 @@ export interface operations {
 				};
 				content: {
 					'application/json': components['schemas']['HealthResponse'];
+				};
+			};
+		};
+	};
+	getBricklinkPart_bricklink_part__part_id__get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				part_id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['BricklinkPartResponse'];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['HTTPValidationError'];
 				};
 			};
 		};

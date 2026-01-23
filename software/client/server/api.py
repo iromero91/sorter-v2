@@ -1,10 +1,11 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import asyncio
 
 from defs.events import IdentityEvent, MachineIdentityData
 from blob_manager import getMachineId
+from bricklink.api import getPartInfo
 
 app = FastAPI(title="Sorter API", version="0.0.1")
 
@@ -57,3 +58,26 @@ async def broadcastEvent(event: dict) -> None:
     for conn in dead_connections:
         if conn in active_connections:
             active_connections.remove(conn)
+
+
+class BricklinkPartResponse(BaseModel):
+    no: str
+    name: str
+    type: str
+    category_id: Optional[int] = None
+    image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    weight: Optional[str] = None
+    dim_x: Optional[str] = None
+    dim_y: Optional[str] = None
+    dim_z: Optional[str] = None
+    year_released: Optional[int] = None
+    is_obsolete: Optional[bool] = None
+
+
+@app.get("/bricklink/part/{part_id}", response_model=BricklinkPartResponse)
+def getBricklinkPart(part_id: str) -> BricklinkPartResponse:
+    data = getPartInfo(part_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+    return BricklinkPartResponse(**data)

@@ -4,6 +4,7 @@ websockets
 pyright
 pydantic-to-typescript
 requests
+requests-oauthlib
 pillow
 numpy
 opencv-python

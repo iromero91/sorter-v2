@@ -11,9 +11,10 @@
 	let save_store = false;
 
 	$effect(() => {
+		const current = $settings;
 		if (save_store) {
 			try {
-				window.localStorage.setItem('settings', JSON.stringify($settings));
+				window.localStorage.setItem('settings', JSON.stringify(current));
 			} catch (e) {
 				console.error(e);
 			}

@@ -7,7 +7,7 @@ interface Settings {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-	theme: 'dark'
+	theme: 'light'
 };
 
 function createSettings() {
