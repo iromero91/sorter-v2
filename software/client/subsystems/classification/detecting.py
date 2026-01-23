@@ -5,7 +5,7 @@ from .states import ClassificationState
 from .carousel import Carousel
 from irl.config import IRLInterface
 from global_config import GlobalConfig
-from vision.utils import masksOverlap
+from vision.utils import maskEdgeProximity
 
 if TYPE_CHECKING:
     from vision import VisionManager
@@ -38,7 +38,10 @@ class Detecting(BaseState):
 
         for obj_mask in object_masks:
             for carousel_mask in carousel_masks:
-                if masksOverlap(obj_mask, carousel_mask):
+                if (
+                    maskEdgeProximity(obj_mask, carousel_mask)
+                    > self.gc.vision_mask_proximity_threshold
+                ):
                     self.logger.info("Detecting: object mask overlaps carousel")
                     self.shared.classification_ready = False
                     self.carousel.addPieceAtFeeder()

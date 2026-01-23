@@ -35,12 +35,12 @@ class FeederConfig:
     def __init__(self):
         self.pause_ms = 200
         self.v1_pulse_length_ms = 600
-        self.v1_pulse_speed = 20
+        self.v1_pulse_speed = 10
         self.v2_pulse_length_ms = 600
-        self.v2_pulse_speed = 20
+        self.v2_pulse_speed = 10
         self.v3_pulse_length_ms = 300
-        self.v3_pulse_speed = 20
-        self.proximity_threshold_px = 10
+        self.v3_pulse_speed = 10
+        self.proximity_threshold_px = 50
 
 
 class GlobalConfig:
@@ -51,9 +51,11 @@ class GlobalConfig:
     feeder_config: FeederConfig
     classification_chamber_vision_model_path: str
     feeder_vision_model_path: str
+    vision_mask_proximity_threshold: float
 
     def __init__(self):
         self.debug_level = 0
+        self.vision_mask_proximity_threshold = 0.5
 
 
 def mkTimeouts() -> Timeouts:

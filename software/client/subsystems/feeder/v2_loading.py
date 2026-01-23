@@ -3,17 +3,11 @@ from typing import Optional
 from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
 from runtime_variables import RuntimeVariables
-from .states import (
-    FeederState,
-    OBJECT_CLASS_ID,
-    CAROUSEL_CLASS_ID,
-    THIRD_V_CHANNEL_CLASS_ID,
-    SECOND_V_CHANNEL_CLASS_ID,
-)
+from .states import FeederState
+from .frame_analysis import getNextFeederState
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 from vision.vision_manager import VisionManager
-from vision.utils import masksOverlap, masksWithinDistance
 
 
 class V2Loading(BaseState):
@@ -28,56 +22,16 @@ class V2Loading(BaseState):
         super().__init__(irl, gc)
         self.shared = shared
         self.vision = vision
-        self.feeder_config = gc.feeder_config
         self.rv = rv
 
     def step(self) -> Optional[FeederState]:
         self._ensureExecutionThreadStarted()
 
+        if not self.shared.classification_ready:
+            return FeederState.IDLE
+
         masks_by_class = self.vision.getFeederMasksByClass()
-        object_masks = masks_by_class.get(OBJECT_CLASS_ID, [])
-        carousel_masks = masks_by_class.get(CAROUSEL_CLASS_ID, [])
-        third_v_masks = masks_by_class.get(THIRD_V_CHANNEL_CLASS_ID, [])
-        second_v_masks = masks_by_class.get(SECOND_V_CHANNEL_CLASS_ID, [])
-
-        threshold = self.feeder_config.proximity_threshold_px
-        carousel_mask = carousel_masks[0] if carousel_masks else None
-        third_v_mask = third_v_masks[0] if third_v_masks else None
-        second_v_mask = second_v_masks[0] if second_v_masks else None
-
-        # check for blocking pieces
-        v2_blocking_v3 = False
-        for obj_mask in object_masks:
-            on_v2 = second_v_mask is not None and masksOverlap(obj_mask, second_v_mask)
-            near_v3 = third_v_mask is not None and masksWithinDistance(
-                obj_mask, third_v_mask, threshold
-            )
-            if on_v2 and near_v3:
-                v2_blocking_v3 = True
-
-        for obj_mask in object_masks:
-            on_carousel = carousel_mask is not None and masksOverlap(
-                obj_mask, carousel_mask
-            )
-            on_v3 = third_v_mask is not None and masksOverlap(obj_mask, third_v_mask)
-            on_v2 = second_v_mask is not None and masksOverlap(obj_mask, second_v_mask)
-
-            if on_carousel:
-                return (
-                    FeederState.V3_DISPENSING
-                    if self.shared.classification_ready
-                    else FeederState.IDLE
-                )
-            if on_v3 and not v2_blocking_v3:
-                return (
-                    FeederState.V3_DISPENSING
-                    if self.shared.classification_ready
-                    else FeederState.IDLE
-                )
-            if on_v2:
-                return None  # stay in V2_LOADING
-
-        return FeederState.IDLE
+        return getNextFeederState(masks_by_class, self.gc, FeederState.V2_LOADING)
 
     def cleanup(self) -> None:
         super().cleanup()
