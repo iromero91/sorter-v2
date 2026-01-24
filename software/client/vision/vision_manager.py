@@ -7,6 +7,7 @@ import numpy as np
 from global_config import GlobalConfig
 from irl.config import IRLConfig
 from defs.events import CameraName, FrameEvent, FrameData, FrameResultData
+from blob_manager import VideoRecorder
 from .camera import CaptureThread
 from .inference import InferenceThread, CameraModelBinding
 from .types import CameraFrame, VisionResult
@@ -20,6 +21,7 @@ class VisionManager:
     _feeder_binding: CameraModelBinding
     _classification_bottom_binding: CameraModelBinding
     _classification_top_binding: CameraModelBinding
+    _video_recorder: Optional[VideoRecorder]
 
     def __init__(self, irl_config: IRLConfig, gc: GlobalConfig):
         self._feeder_capture = CaptureThread("feeder", irl_config.feeder_camera)
@@ -51,6 +53,8 @@ class VisionManager:
             self._classification_top_capture, classification_model
         )
 
+        self._video_recorder = VideoRecorder() if gc.should_write_camera_feeds else None
+
     def start(self) -> None:
         self._feeder_capture.start()
         self._classification_bottom_capture.start()
@@ -62,6 +66,16 @@ class VisionManager:
         self._feeder_capture.stop()
         self._classification_bottom_capture.stop()
         self._classification_top_capture.stop()
+        if self._video_recorder:
+            self._video_recorder.close()
+
+    def recordFrames(self) -> None:
+        if not self._video_recorder:
+            return
+        for camera in ["feeder", "classification_bottom", "classification_top"]:
+            frame = self.getFrame(camera)
+            if frame:
+                self._video_recorder.writeFrame(camera, frame.raw, frame.annotated)
 
     @property
     def feeder_frame(self) -> Optional[CameraFrame]:

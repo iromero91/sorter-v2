@@ -1,9 +1,13 @@
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
+import cv2
+import numpy as np
 
 DATA_FILE = Path(__file__).parent / "data.json"
+BLOB_DIR = Path(__file__).parent / "blob"
 
 
 def loadData() -> dict[str, Any]:
@@ -61,3 +65,53 @@ def setBinCategories(categories: list[list[list[str | None]]]) -> None:
     data = loadData()
     data["bin_categories"] = categories
     saveData(data)
+
+
+CAMERA_NAMES = ["feeder", "classification_bottom", "classification_top"]
+
+
+class VideoRecorder:
+    _run_dir: Path
+    _writers: dict[str, cv2.VideoWriter]
+    _fps: int
+    _frame_size: tuple[int, int]
+
+    def __init__(self, fps: int = 30, frame_size: tuple[int, int] = (640, 480)):
+        self._fps = fps
+        self._frame_size = frame_size
+        self._writers = {}
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self._run_dir = BLOB_DIR / timestamp
+        self._run_dir.mkdir(parents=True, exist_ok=True)
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        for camera in CAMERA_NAMES:
+            raw_path = self._run_dir / f"{camera}_raw.mp4"
+            annotated_path = self._run_dir / f"{camera}_annotated.mp4"
+            self._writers[f"{camera}_raw"] = cv2.VideoWriter(
+                str(raw_path), fourcc, fps, frame_size
+            )
+            self._writers[f"{camera}_annotated"] = cv2.VideoWriter(
+                str(annotated_path), fourcc, fps, frame_size
+            )
+
+    def writeFrame(
+        self, camera: str, raw: Optional[np.ndarray], annotated: Optional[np.ndarray]
+    ) -> None:
+        if raw is not None:
+            raw_key = f"{camera}_raw"
+            if raw_key in self._writers:
+                resized = cv2.resize(raw, self._frame_size)
+                self._writers[raw_key].write(resized)
+
+        if annotated is not None:
+            ann_key = f"{camera}_annotated"
+            if ann_key in self._writers:
+                resized = cv2.resize(annotated, self._frame_size)
+                self._writers[ann_key].write(resized)
+
+    def close(self) -> None:
+        for writer in self._writers.values():
+            writer.release()
+        self._writers.clear()

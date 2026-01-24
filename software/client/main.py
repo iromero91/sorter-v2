@@ -105,13 +105,14 @@ def main() -> None:
             #     main_to_server_queue.put(heartbeat)
             #     last_heartbeat = current_time
 
-            # broadcast camera frames
+            # broadcast camera frames and record to disk
             if (
                 current_time - last_frame_broadcast
                 >= FRAME_BROADCAST_INTERVAL_MS / 1000.0
             ):
                 for frame_event in vision.getAllFrameEvents():
                     main_to_server_queue.put(frame_event)
+                vision.recordFrames()
                 last_frame_broadcast = current_time
 
             controller.step()
