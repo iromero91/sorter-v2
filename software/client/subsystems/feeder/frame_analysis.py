@@ -59,8 +59,6 @@ def getNextFeederState(
         elif on_v1:
             objects_on_v1.append(obj_mask)
 
-        print("objects", len(objects_on_v3), len(objects_on_v2), len(objects_on_v1))
-
     # check if any v3 objects are close to carousel
     if carousel_mask is not None:
         for obj_mask in objects_on_v3:

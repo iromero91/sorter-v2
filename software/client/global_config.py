@@ -42,9 +42,9 @@ class FeederConfig:
         self.v2_pulse_length_ms = 300
         self.v2_pulse_speed = 30
         self.v3_pulse_length_ms = 300
-        self.v3_pulse_speed = 30
+        self.v3_pulse_speed = 32
         self.slow_v3_pulse_length_ms = 300
-        self.slow_v3_pulse_speed = 20
+        self.slow_v3_pulse_speed = 23
         self.proximity_threshold_px = 40
         self.proximity_to_carousel_threshold_px = 20
 
