@@ -5,12 +5,16 @@ from subsystems.shared_variables import SharedVariables
 from .states import FeederState
 from irl.config import IRLInterface
 from global_config import GlobalConfig
+from vision import VisionManager
 
 
 class Feeding(BaseState):
-    def __init__(self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables):
+    def __init__(
+        self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables, vision: VisionManager
+    ):
         super().__init__(irl, gc)
         self.shared = shared
+        self.vision = vision
 
     def step(self) -> Optional[FeederState]:
         self._ensureExecutionThreadStarted()
@@ -22,6 +26,8 @@ class Feeding(BaseState):
     def _executionLoop(self) -> None:
         fc = self.gc.feeder_config
         while not self._stop_event.is_set():
+            aruco_tags = self.vision.getFeederArucoTags()
+
             self.irl.first_c_channel_rotor_stepper.moveSteps(
                 -fc.steps_per_pulse, fc.normal_delay_us
             )

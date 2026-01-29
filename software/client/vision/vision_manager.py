@@ -25,6 +25,7 @@ class VisionManager:
     _video_recorder: Optional[VideoRecorder]
 
     def __init__(self, irl_config: IRLConfig, gc: GlobalConfig):
+        self.gc = gc
         self._feeder_capture = CaptureThread("feeder", irl_config.feeder_camera)
         self._classification_bottom_capture = CaptureThread(
             "classification_bottom", irl_config.classification_camera_bottom
@@ -56,7 +57,7 @@ class VisionManager:
 
         self._video_recorder = VideoRecorder() if gc.should_write_camera_feeds else None
 
-        self._aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+        self._aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_ARUCO_ORIGINAL)
         self._aruco_params = aruco.DetectorParameters()
 
     def start(self) -> None:
@@ -148,6 +149,14 @@ class VisionManager:
                 center_x = float(np.mean(tag_corners[:, 0]))
                 center_y = float(np.mean(tag_corners[:, 1]))
                 result[int(tag_id)] = (center_x, center_y)
+
+        if result:
+            tag_ids = ", ".join([f"#{tag_id}" for tag_id in result.keys()])
+            self.gc.logger.info(f"Detected ArUco tags: {tag_ids}")
+        else:
+            self.gc.logger.info(f"found no tags")
+
+
         return result
 
     def getFeederMasksByClass(self) -> Dict[int, List[np.ndarray]]:

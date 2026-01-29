@@ -5,10 +5,13 @@ from .idle import Idle
 from .feeding import Feeding
 from irl.config import IRLInterface
 from global_config import GlobalConfig
+from vision import VisionManager
 
 
 class FeederStateMachine(BaseSubsystem):
-    def __init__(self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables):
+    def __init__(
+        self, irl: IRLInterface, gc: GlobalConfig, shared: SharedVariables, vision: VisionManager
+    ):
         super().__init__()
         self.irl = irl
         self.gc = gc
@@ -17,7 +20,7 @@ class FeederStateMachine(BaseSubsystem):
         self.current_state = FeederState.IDLE
         self.states_map = {
             FeederState.IDLE: Idle(irl, gc, shared),
-            FeederState.FEEDING: Feeding(irl, gc, shared),
+            FeederState.FEEDING: Feeding(irl, gc, shared, vision),
         }
 
     def step(self) -> None:

@@ -99,9 +99,9 @@ def mkIRLConfig() -> IRLConfig:
     irl_config.third_c_channel_rotor_stepper = mkStepperConfig(
         step_pin=54, dir_pin=55, enable_pin=38
     )
-    irl_config.first_c_channel_aruco_tag_id = 1
-    irl_config.second_c_channel_aruco_tag_id = 2
-    irl_config.third_c_channel_aruco_tag_id = 3
+    irl_config.first_c_channel_aruco_tag_id = 86
+    irl_config.second_c_channel_aruco_tag_id = 815
+    irl_config.third_c_channel_aruco_tag_id = 957
     return irl_config
 
 
