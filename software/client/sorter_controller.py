@@ -1,5 +1,5 @@
 from defs.sorter_controller import SorterLifecycle
-from irl.config import IRLInterface
+from irl.config import IRLInterface, IRLConfig
 from global_config import GlobalConfig
 from runtime_variables import RuntimeVariables
 from coordinator import Coordinator
@@ -11,6 +11,7 @@ class SorterController:
     def __init__(
         self,
         irl: IRLInterface,
+        irl_config: IRLConfig,
         gc: GlobalConfig,
         vision: VisionManager,
         event_queue: queue.Queue,
@@ -21,9 +22,12 @@ class SorterController:
         self.gc = gc
         self.vision = vision
         self.event_queue = event_queue
-        self.coordinator = Coordinator(irl, gc, vision, event_queue, rv)
+        self.coordinator = Coordinator(irl, irl_config, gc, vision, event_queue, rv)
 
     def start(self) -> None:
+        self.state = SorterLifecycle.PAUSED
+
+    def resume(self) -> None:
         self.state = SorterLifecycle.RUNNING
 
     def pause(self) -> None:

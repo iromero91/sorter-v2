@@ -2,6 +2,7 @@ from global_config import GlobalConfig
 from .mcu import MCU
 from .stepper import Stepper
 from .device_discovery import discoverMCUs
+import time
 
 
 class CameraConfig:
@@ -123,6 +124,7 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
         name="carousel",
         default_delay_us=1000,
     )
+    time.sleep(1)
 
     irl_interface.chute_stepper = Stepper(
         gc,
@@ -133,6 +135,7 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
         name="chute",
         default_delay_us=400,
     )
+    time.sleep(1)
 
     irl_interface.first_c_channel_rotor_stepper = Stepper(
         gc,
@@ -143,6 +146,7 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
         name="first_c_channel_rotor",
         default_delay_us=800,
     )
+    time.sleep(1)
 
     irl_interface.second_c_channel_rotor_stepper = Stepper(
         gc,
@@ -153,6 +157,7 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
         name="second_c_channel_rotor",
         default_delay_us=800,
     )
+    time.sleep(1)
 
     irl_interface.third_c_channel_rotor_stepper = Stepper(
         gc,
@@ -163,5 +168,6 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
         name="third_c_channel_rotor",
         default_delay_us=800,
     )
+    time.sleep(1)
 
     return irl_interface

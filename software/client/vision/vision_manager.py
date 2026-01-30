@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Tuple
+from collections import deque
 import base64
 import time
 import cv2
@@ -8,10 +9,15 @@ import numpy as np
 from global_config import GlobalConfig
 from irl.config import IRLConfig
 from defs.events import CameraName, FrameEvent, FrameData, FrameResultData
+from defs.consts import FEEDER_CHANNEL_CLASS_ID, FEEDER_OBJECT_CLASS_ID
 from blob_manager import VideoRecorder
 from .camera import CaptureThread
 from .inference import InferenceThread, CameraModelBinding
-from .types import CameraFrame, VisionResult
+from .types import CameraFrame, VisionResult, DetectedMask
+
+ANNOTATE_ARUCO_TAGS = True
+ARUCO_TAG_CACHE_MS = 5000
+FEEDER_MASK_CACHE_FRAMES = 3
 
 
 class VisionManager:
@@ -26,6 +32,7 @@ class VisionManager:
 
     def __init__(self, irl_config: IRLConfig, gc: GlobalConfig):
         self.gc = gc
+        self._feeder_camera_config = irl_config.feeder_camera
         self._feeder_capture = CaptureThread("feeder", irl_config.feeder_camera)
         self._classification_bottom_capture = CaptureThread(
             "classification_bottom", irl_config.classification_camera_bottom
@@ -59,6 +66,8 @@ class VisionManager:
 
         self._aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_ARUCO_ORIGINAL)
         self._aruco_params = aruco.DetectorParameters()
+        self._aruco_tag_cache: Dict[int, Tuple[Tuple[float, float], float]] = {}
+        self._feeder_mask_cache: deque = deque(maxlen=FEEDER_MASK_CACHE_FRAMES)
 
     def start(self) -> None:
         self._feeder_capture.start()
@@ -84,9 +93,31 @@ class VisionManager:
 
     @property
     def feeder_frame(self) -> Optional[CameraFrame]:
-        return (
+        frame = (
             self._feeder_binding.latest_annotated_frame
             or self._feeder_capture.latest_frame
+        )
+        if frame is None:
+            return None
+
+        if not ANNOTATE_ARUCO_TAGS:
+            return frame
+
+        # annotate with ArUco tags
+        annotated = frame.annotated if frame.annotated is not None else frame.raw
+        gray = cv2.cvtColor(frame.raw, cv2.COLOR_BGR2GRAY)
+        detector = aruco.ArucoDetector(self._aruco_dict, self._aruco_params)
+        corners, ids, _ = detector.detectMarkers(gray)
+
+        if ids is not None:
+            annotated = annotated.copy()
+            aruco.drawDetectedMarkers(annotated, corners, ids)
+
+        return CameraFrame(
+            raw=frame.raw,
+            annotated=annotated,
+            result=frame.result,
+            timestamp=frame.timestamp,
         )
 
     @property
@@ -138,17 +169,32 @@ class VisionManager:
         if frame is None:
             return {}
 
+        current_time = time.time()
         gray = cv2.cvtColor(frame.raw, cv2.COLOR_BGR2GRAY)
         detector = aruco.ArucoDetector(self._aruco_dict, self._aruco_params)
         corners, ids, _ = detector.detectMarkers(gray)
 
         result: Dict[int, Tuple[float, float]] = {}
+        detected_ids = set()
+
+        # add newly detected tags
         if ids is not None:
             for i, tag_id in enumerate(ids.flatten()):
                 tag_corners = corners[i][0]
                 center_x = float(np.mean(tag_corners[:, 0]))
                 center_y = float(np.mean(tag_corners[:, 1]))
-                result[int(tag_id)] = (center_x, center_y)
+                tag_id_int = int(tag_id)
+                result[tag_id_int] = (center_x, center_y)
+                detected_ids.add(tag_id_int)
+                # update cache
+                self._aruco_tag_cache[tag_id_int] = ((center_x, center_y), current_time)
+
+        # check cache for recently seen tags that weren't detected this frame
+        for tag_id, (position, timestamp) in list(self._aruco_tag_cache.items()):
+            if tag_id not in detected_ids:
+                age_ms = (current_time - timestamp) * 1000
+                if age_ms <= ARUCO_TAG_CACHE_MS:
+                    result[tag_id] = position
 
         if result:
             tag_ids = ", ".join([f"#{tag_id}" for tag_id in result.keys()])
@@ -156,24 +202,108 @@ class VisionManager:
         else:
             self.gc.logger.info(f"found no tags")
 
-
         return result
 
-    def getFeederMasksByClass(self) -> Dict[int, List[np.ndarray]]:
+    def getFeederMasksByClass(self) -> Dict[int, List[DetectedMask]]:
+        # HUGE COMMENT: THIS NEEDS REFACTORING FOR CLARITY
+        # This function caches ONLY object masks (moving pieces) across frames.
+        # Channel and carousel masks are stationary so we always return current frame only.
+        # For objects: accumulate detections across multiple frames for stability.
+        # This helps with detection reliability when pieces are moving.
+        # Should eventually be refactored for proper object tracking and lifecycle management.
+
         results = self._feeder_binding.latest_raw_results
         if not results or len(results) == 0:
-            return {}
+            # no new results, return cached objects only
+            aggregated: Dict[int, List[DetectedMask]] = {}
+            for object_masks in self._feeder_mask_cache:
+                if FEEDER_OBJECT_CLASS_ID not in aggregated:
+                    aggregated[FEEDER_OBJECT_CLASS_ID] = []
+                aggregated[FEEDER_OBJECT_CLASS_ID].extend(object_masks)
+            return aggregated
 
-        masks_by_class: Dict[int, List[np.ndarray]] = {}
+        # process current frame
+        current_frame_all_masks: Dict[int, List[DetectedMask]] = {}
+        current_frame_object_masks: List[DetectedMask] = []
+
         for result in results:
             if result.masks is not None:
                 for i, mask in enumerate(result.masks):
                     class_id = int(result.boxes[i].cls.item())
+                    confidence = float(result.boxes[i].conf.item())
                     mask_data = mask.data[0].cpu().numpy()
-                    if class_id not in masks_by_class:
-                        masks_by_class[class_id] = []
-                    masks_by_class[class_id].append(mask_data)
-        return masks_by_class
+
+                    # get track ID if available, otherwise use index
+                    instance_id = i
+                    if result.boxes[i].id is not None:
+                        instance_id = int(result.boxes[i].id.item())
+
+                    # scale mask from model space to camera resolution
+                    model_height, model_width = mask_data.shape
+                    camera_height = self._feeder_camera_config.height
+                    camera_width = self._feeder_camera_config.width
+
+                    if model_height != camera_height or model_width != camera_width:
+                        scaled_mask = cv2.resize(
+                            mask_data.astype(np.uint8),
+                            (camera_width, camera_height),
+                            interpolation=cv2.INTER_NEAREST,
+                        ).astype(bool)
+                    else:
+                        scaled_mask = mask_data.astype(bool)
+
+                    detected_mask = DetectedMask(
+                        mask=scaled_mask,
+                        confidence=confidence,
+                        class_id=class_id,
+                        instance_id=instance_id,
+                    )
+
+                    if class_id not in current_frame_all_masks:
+                        current_frame_all_masks[class_id] = []
+                    current_frame_all_masks[class_id].append(detected_mask)
+
+                    # cache only object masks
+                    if class_id == FEEDER_OBJECT_CLASS_ID:
+                        current_frame_object_masks.append(detected_mask)
+
+        # add only object masks to cache
+        self._feeder_mask_cache.append(current_frame_object_masks)
+
+        # build result: current frame for channels/carousel, aggregated cache for objects
+        result_masks: Dict[int, List[DetectedMask]] = {}
+
+        # add all non-object masks from current frame only
+        for class_id, masks in current_frame_all_masks.items():
+            if class_id != FEEDER_OBJECT_CLASS_ID:
+                result_masks[class_id] = masks
+
+        # aggregate object masks from cache
+        result_masks[FEEDER_OBJECT_CLASS_ID] = []
+        for object_masks in self._feeder_mask_cache:
+            result_masks[FEEDER_OBJECT_CLASS_ID].extend(object_masks)
+
+        return result_masks
+
+    def getIdentifiedChannels(
+        self,
+        first_tag_id: int,
+        second_tag_id: int,
+        third_tag_id: int,
+    ):
+        from subsystems.feeder.analysis import IdentifiedChannels, identifyChannels
+
+        aruco_tags = self.getFeederArucoTags()
+        masks_by_class = self.getFeederMasksByClass()
+        channel_detected_masks = masks_by_class.get(FEEDER_CHANNEL_CLASS_ID, [])
+
+        return identifyChannels(
+            channel_detected_masks,
+            aruco_tags,
+            first_tag_id,
+            second_tag_id,
+            third_tag_id,
+        )
 
     def captureFreshClassificationFrames(
         self, timeout_s: float = 1.0

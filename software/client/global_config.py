@@ -11,17 +11,44 @@ class Timeouts:
         self.heartbeat_interval_ms = 5000
 
 
-class FeederConfig:
-    normal_delay_us: int
-    precise_delay_us: int
+class RotorPulseConfig:
     steps_per_pulse: int
+    delay_us: int
     delay_between_pulse_ms: int
 
+    def __init__(self, steps: int, delay_us: int, delay_between_ms: int):
+        self.steps_per_pulse = steps
+        self.delay_us = delay_us
+        self.delay_between_pulse_ms = delay_between_ms
+
+
+class FeederConfig:
+    first_rotor: RotorPulseConfig
+    second_rotor: RotorPulseConfig
+    third_rotor_normal: RotorPulseConfig
+    third_rotor_precision: RotorPulseConfig
+    third_channel_dropzone_threshold_px: int
+    second_channel_dropzone_threshold_px: int
+    object_channel_overlap_threshold: float
+    carousel_proximity_threshold_px: int
+
     def __init__(self):
-        self.normal_delay_us = 500
-        self.precise_delay_us = 1000
-        self.steps_per_pulse = 1000
-        self.delay_between_pulse_ms = 500
+        self.first_rotor = RotorPulseConfig(
+            steps=200, delay_us=200, delay_between_ms=2000
+        )
+        self.second_rotor = RotorPulseConfig(
+            steps=500, delay_us=200, delay_between_ms=250
+        )
+        self.third_rotor_normal = RotorPulseConfig(
+            steps=1000, delay_us=200, delay_between_ms=250
+        )
+        self.third_rotor_precision = RotorPulseConfig(
+            steps=100, delay_us=800, delay_between_ms=350
+        )
+        self.third_channel_dropzone_threshold_px = 350
+        self.second_channel_dropzone_threshold_px = 500
+        self.object_channel_overlap_threshold = 0.15
+        self.carousel_proximity_threshold_px = 50
 
 
 class GlobalConfig:
@@ -57,5 +84,5 @@ def mkGlobalConfig() -> GlobalConfig:
     gc.timeouts = mkTimeouts()
     gc.feeder_config = mkFeederConfig()
     gc.classification_chamber_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/run_1769112999_640_small_100epochs_20batch_data/weights/best.pt"
-    gc.feeder_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/c_channel_feeder_02_1769720964_640_small_100epochs_20batch/weights/best.pt"
+    gc.feeder_vision_model_path = "/Users/spencer/code/yolo-trainer/runs/segment/checkpoints/c_channel_feeder_02_1769745064_640_small_100epochs_20batch/weights/last.pt"
     return gc

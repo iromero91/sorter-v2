@@ -69,7 +69,7 @@ class InferenceThread:
                 processed_any = True
                 binding.last_processed_timestamp = frame.timestamp
 
-                results = binding.model(frame.raw, verbose=False)
+                results = binding.model.track(frame.raw, verbose=False, persist=False)
 
                 result = None
                 annotated = frame.raw.copy()

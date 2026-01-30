@@ -13,6 +13,14 @@ class VisionResult:
 
 
 @dataclass
+class DetectedMask:
+    mask: np.ndarray
+    confidence: float
+    class_id: int
+    instance_id: int
+
+
+@dataclass
 class CameraFrame:
     raw: np.ndarray
     annotated: Optional[np.ndarray]

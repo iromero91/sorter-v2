@@ -7,7 +7,7 @@ from subsystems import (
     layoutMatchesCategories,
     applyCategories,
 )
-from irl.config import IRLInterface
+from irl.config import IRLInterface, IRLConfig
 from global_config import GlobalConfig
 from runtime_variables import RuntimeVariables
 from vision import VisionManager
@@ -20,12 +20,14 @@ class Coordinator:
     def __init__(
         self,
         irl: IRLInterface,
+        irl_config: IRLConfig,
         gc: GlobalConfig,
         vision: VisionManager,
         event_queue: queue.Queue,
         rv: RuntimeVariables,
     ):
         self.irl = irl
+        self.irl_config = irl_config
         self.gc = gc
         self.logger = gc.logger
         self.vision = vision
@@ -53,7 +55,7 @@ class Coordinator:
         self.classification = ClassificationStateMachine(
             irl, gc, self.shared, vision, event_queue
         )
-        self.feeder = FeederStateMachine(irl, gc, self.shared, vision)
+        self.feeder = FeederStateMachine(irl, irl_config, gc, self.shared, vision)
 
     def step(self) -> None:
         self.feeder.step()
