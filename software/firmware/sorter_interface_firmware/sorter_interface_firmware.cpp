@@ -46,7 +46,7 @@ Stepper steppers[4] = {
 
 const int TMC_UART_TX_PIN = 0; // 16 on final board
 const int TMC_UART_RX_PIN = 1; // 17 on final board
-const int TMC_UART_BAUDRATE = 200000;
+const int TMC_UART_BAUDRATE = 400000;
 
 const int STEPPER_nEN_PIN = 6; // TBD on final board
 
@@ -101,7 +101,7 @@ int main()
         //tmc_drivers[i].enableDriver(true);
         steppers[i].initialize();
         steppers[i].setAcceleration(20000);
-        steppers[i].setSpeedLimits(16, 2000);
+        steppers[i].setSpeedLimits(16, 4000);
         tmc_drivers[i].initialize();
         tmc_drivers[i].enableDriver(true);
         tmc_drivers[i].setCurrent(31, 16, 10);
@@ -114,24 +114,20 @@ int main()
     // Initialize Core 1
     multicore_launch_core1(core1_entry);
 
-    int stepper_moves[4] = {5000, -3000, 1500, -2500};
+    int stepper_moves[4] = {5000, -1111, 1500, -2400};
 
     while (true) {
         // Main loop, this deals with communications and high level command processing
         // for now, try moving the steppers in a test pattern
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 4; i++) {
             if (steppers[i].moveSteps(stepper_moves[i])) {
                 printf("Stepper %d moving %d steps\n", i, stepper_moves[i]);
                 stepper_moves[i] = -stepper_moves[i]; // Reverse direction for next move
                 if (stepper_moves[i] > 0) {
                     tmc_drivers[i].setMicrosteps(MICROSTEP_16);
                 } else {
-                    tmc_drivers[i].setMicrosteps(MICROSTEP_4);
+                    tmc_drivers[i].setMicrosteps(MICROSTEP_32);
                 }
-                // read the chopconf register to verify microstep setting
-                TMC2209ChopperConfig chopconf;
-                int res = tmc_bus.readRegister(i, TMC2209_Register::CHOPCONF, &chopconf.value);
-                printf("Stepper %d CHOPCONF: 0x%08X, MRES: %d\n", i, chopconf.value, chopconf.mres);
             }
             
         }
