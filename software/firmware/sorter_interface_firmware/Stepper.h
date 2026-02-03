@@ -48,6 +48,7 @@ public:
     void setAcceleration(uint32_t acceleration);
     bool moveSteps(int32_t distance);
     bool moveAtSpeed(int32_t speed);
+    bool isStopped() { return _state == STEPPER_STOPPED; }
 
 private:
     // Pins for the step generator

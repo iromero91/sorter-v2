@@ -22,6 +22,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
@@ -29,6 +30,57 @@
 #include "Stepper.h"
 #include "TMC_UART.h"
 #include "TMC2209.h"
+
+// Break this off into a separate module later (communications)
+
+#include "cobs.h"
+
+
+/** \brief Calculate CRC-32 of a given data buffer using the standard polynomial 0xEDB88320
+ * 
+ * \param data Pointer to the data buffer
+ * \param length Length of the data buffer in bytes
+ * \return Calculated CRC-32 value
+ */
+uint32_t crc32(const void *data, size_t length) {
+    const uint8_t *byte_data = (const uint8_t *)data;
+    uint32_t crc = 0xFFFFFFFF;
+    for (size_t i = 0; i < length; i++) {
+        crc ^= byte_data[i];
+        for (int j = 0; j < 8; j++) {
+            if (crc & 1) {
+                crc = (crc >> 1) ^ 0xEDB88320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    return ~crc;
+}
+
+struct Message{
+    uint8_t phantom; // Must be 0 for COBS
+    uint8_t dev_address; // Device address, ignored on USB connections
+    uint8_t command; // Command code (from 0 to 127, high bit is used to signal exceptions)
+    uint8_t payload_length; // Length of payload in bytes
+    uint8_t payload[]; // Payload data
+};
+
+enum CommandCodes {
+    // Common Commands
+    CMD_INIT = 0x01,
+    CMD_PING = 0x02,
+    // Stepper Commands
+    CMD_STEPPER_MOVE_STEPS = 0x10,
+    CMD_STEPPER_MOVE_AT_SPEED = 0x11,
+    CMD_STEPPER_SET_SPEED_LIMITS = 0x12,
+    CMD_STEPPER_SET_ACCELERATION = 0x13,
+    CMD_STEPPER_IS_STOPPED = 0x14,
+
+    CMD_BAD_COMMAND = 0xFF
+};
+
+// End break
 
 #define MAIN_TRACE_ENABLED
 
@@ -133,22 +185,179 @@ int main()
     // Initialize Core 1
     multicore_launch_core1(core1_entry);
 
-    int stepper_moves[4] = {5000, -1111, 1500, -2400};
+    char rx_buffer[255], tx_buffer[255];
+    int rx_buffer_pos = 0, msg_len = 0;
 
+    // Main loop, this deals with communications and high level command processing
     while (true) {
-        // Main loop, this deals with communications and high level command processing
-        // for now, try moving the steppers in a test pattern
-        for (int i = 0; i < 4; i++) {
-            if (steppers[i].moveSteps(stepper_moves[i])) {
-                printf("Stepper %d moving %d steps\n", i, stepper_moves[i]);
-                stepper_moves[i] = -stepper_moves[i]; // Reverse direction for next move
-                if (stepper_moves[i] > 0) {
-                    tmc_drivers[i].setMicrosteps(MICROSTEP_16);
-                } else {
-                    tmc_drivers[i].setMicrosteps(MICROSTEP_32);
-                }
+        // Check if there is any data coming from USB, append it to the rx_buffer until exhausted or we find a \0. 
+        // If we do find a \0, we set msg_len to the length of the message (excluding \0) and process it.
+        // If we don't find a \0 and the buffer is full, we mark this as a framing error (msg_len = -1) so we don't process it.
+        while (true) {
+            int c = stdio_getchar_timeout_us(0);
+            if (c == PICO_ERROR_TIMEOUT) {
+                // No more data
+                break;
             }
-            
+            if (c == 0) {
+                // End of message
+                if (rx_buffer_pos == 0) {
+                    // Empty message, ignore
+                    msg_len = 0;
+                    break;
+                }
+                int res = COBS_short_decode_inplace(rx_buffer, rx_buffer_pos);
+                if (res) { 
+                    msg_len = -1; // Framing error
+                    rx_buffer_pos = 0;
+                    break;
+                }
+                res = crc32(rx_buffer, rx_buffer_pos);
+                if (res != 0) { 
+                    msg_len = -1; // CRC error
+                    rx_buffer_pos = 0;
+                    break;
+                }
+                msg_len = rx_buffer_pos - 4; // Exclude CRC
+                rx_buffer_pos = 0;
+                break;
+            }
+            if (rx_buffer_pos < sizeof(rx_buffer)) {
+                rx_buffer[rx_buffer_pos++] = (char)c;
+            } else {
+                // Buffer full, framing error
+                msg_len = -1;
+                rx_buffer_pos = 0;
+                break;
+            }
+        }
+        // If we have a complete message, process it
+        if (msg_len > 0) {
+            // Process message
+            struct Message* msg = (struct Message*)rx_buffer;
+            // Prepare response message
+            struct Message* resp = (struct Message*)tx_buffer;
+            resp->phantom = 0;
+            resp->dev_address = msg->dev_address;
+            switch (msg->command) {
+                case CMD_INIT:
+                    resp->command = CMD_INIT;
+                    // Stop all steppers
+                    for (int i = 0; i < 4; i++) {
+                        steppers[i].moveAtSpeed(0);
+                    }
+                    resp->payload_length = 0;
+                    break;
+                case CMD_PING:
+                    resp->command = CMD_PING;
+                    // Copy payload back
+                    resp->payload_length = msg->payload_length;
+                    memcpy(resp->payload, msg->payload, msg->payload_length);
+                    break;
+                case CMD_STEPPER_MOVE_STEPS:
+                    if (msg->payload_length == 8) {
+                        int32_t stepper_id = *((int32_t*)msg->payload);
+                        int32_t distance = *((int32_t*)(msg->payload + 4));
+                        if (stepper_id < 0 || stepper_id >= 4) {
+                            resp->command = msg->command | 0x80; // Exception, bad arguments
+                            resp->payload_length = 0;
+                        } else {
+                            resp->command = msg->command;
+                            resp->payload_length = 4;
+                            bool res = steppers[stepper_id].moveSteps(distance);
+                            *((uint32_t*)resp->payload) = res ? 1 : 0;
+                        }
+                    } else {
+                        resp->command = msg->command | 0x80; // Exception, bad payload
+                        resp->payload_length = 0;
+                    }
+                    break;
+                case CMD_STEPPER_MOVE_AT_SPEED:
+                    if (msg->payload_length == 8) {
+                        int32_t stepper_id = *((int32_t*)msg->payload);
+                        int32_t speed = *((int32_t*)(msg->payload + 4));
+                        if (stepper_id < 0 || stepper_id >= 4) {
+                            resp->command = msg->command | 0x80; // Exception, bad arguments
+                            resp->payload_length = 0;
+                        } else {
+                            resp->command = msg->command;
+                            resp->payload_length = 4;
+                            bool res = steppers[stepper_id].moveAtSpeed(speed);
+                            *((uint32_t*)resp->payload) = res ? 1 : 0;
+                        }
+                    } else {
+                        resp->command = msg->command | 0x80; // Exception, bad payload
+                        resp->payload_length = 0;
+                    }
+                    break;
+                case CMD_STEPPER_SET_SPEED_LIMITS:
+                    if (msg->payload_length == 12) {
+                        int32_t stepper_id = *((int32_t*)msg->payload);
+                        uint32_t min_speed = *((uint32_t*)(msg->payload + 4));
+                        uint32_t max_speed = *((uint32_t*)(msg->payload + 8));
+                        if (stepper_id < 0 || stepper_id >= 4) {
+                            resp->command = msg->command | 0x80; // Exception, bad arguments
+                            resp->payload_length = 0;
+                        } else {
+                            steppers[stepper_id].setSpeedLimits(min_speed, max_speed);
+                            resp->command = msg->command;
+                            resp->payload_length = 0;
+                        }
+                    } else {
+                        resp->command = msg->command | 0x80; // Exception, bad payload
+                        resp->payload_length = 0;
+                    }
+                    break;
+                case CMD_STEPPER_SET_ACCELERATION:
+                    if (msg->payload_length == 8) {
+                        int32_t stepper_id = *((int32_t*)msg->payload);
+                        uint32_t acceleration = *((uint32_t*)(msg->payload + 4));
+                        if (stepper_id < 0 || stepper_id >= 4) {
+                            resp->command = msg->command | 0x80; // Exception, bad arguments
+                            resp->payload_length = 0;
+                        } else {
+                            steppers[stepper_id].setAcceleration(acceleration);
+                            resp->command = msg->command;
+                            resp->payload_length = 0;
+                        }
+                    } else {
+                        resp->command = msg->command | 0x80; // Exception, bad payload
+                        resp->payload_length = 0;
+                    }
+                    break;
+                case CMD_STEPPER_IS_STOPPED:
+                    if (msg->payload_length == 4) {
+                        int32_t stepper_id = *((int32_t*)msg->payload);
+                        if (stepper_id < 0 || stepper_id >= 4) {
+                            resp->command = msg->command | 0x80; // Exception, bad arguments
+                            resp->payload_length = 0;
+                        } else {
+                            resp->command = msg->command;
+                            resp->payload_length = 4;
+                            bool res = steppers[stepper_id].isStopped();
+                            *((uint32_t*)resp->payload) = res ? 1 : 0;
+                        }
+                    } else {
+                        resp->command = msg->command | 0x80; // Exception, bad payload
+                        resp->payload_length = 0;
+                    }
+                    break;
+                default:
+                    resp->command = CMD_BAD_COMMAND; // Exception, bad command
+                    resp->payload_length = 0;
+                    break;
+            }
+            // Calculate total response length
+            int resp_len = 4 + resp->payload_length; // Header + payload
+            // Append CRC
+            uint32_t crc = crc32(resp, resp_len);
+            memcpy(tx_buffer + resp_len, &crc, sizeof(crc));
+            resp_len += sizeof(crc);
+            // COBS encode response in place
+            COBS_short_encode_inplace(tx_buffer, resp_len);
+            // Send response
+            tx_buffer[resp_len] = 0; // Message terminator
+            stdio_put_string(tx_buffer, resp_len+1, false, false);
         }
     }
 }
