@@ -36,13 +36,15 @@ import logging
 
 from sympy import true
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 import serial
 import struct
 from zlib import crc32
 
 from dataclasses import dataclass
+
+DBG_MESSAGE_COUNT = 0
 
 class CommandCodes:
     # Common Commands
@@ -109,6 +111,8 @@ class SorterInterfaceBus:
         if message.command & 0x80:
             raise RuntimeError(f"Error response received, command: {message.command:#04x}")
         
+        global DBG_MESSAGE_COUNT
+        DBG_MESSAGE_COUNT += 1
         return message
 
 
@@ -149,19 +153,27 @@ class SorterInterfaceCard:
 
 
 if __name__ == "__main__":
-    import sys, random
+    import sys, random, time
     if len(sys.argv) != 2:
         print("Usage: python sorter_interface.py <serial_port>")
         sys.exit(1)
     port = sys.argv[1]
     bus = SorterInterfaceBus(port)
     card = SorterInterfaceCard(bus, address=1)
+    start_time = time.monotonic()
+    message_count = DBG_MESSAGE_COUNT
     try:
         while true:
             for i in range(4):
                 if card.stepper_is_stopped(channel=i):
                     card.stepper_set_speed_limits(channel=i, min_speed=16, max_speed=random.randint(500, 2500))
                     card.stepper_set_acceleration(channel=i, acceleration=random.randint(1000, 20000))
-                    card.stepper_move_steps(channel=i, steps=random.randint(-2000, 2000))
+                    card.stepper_move_steps(channel=i, steps=random.randint(200, 2000)*random.choice([-1, 1]))
+                now = time.monotonic()
+                if now - start_time > 1:
+                    elapsed = now - start_time
+                    print(f"Elapsed time: {elapsed:.2f} seconds, Messages: {DBG_MESSAGE_COUNT - message_count}, Rate: {(DBG_MESSAGE_COUNT - message_count)/elapsed:.2f} msg/s")
+                    message_count = DBG_MESSAGE_COUNT
+                    start_time = now
     except DecodeError as e:
         print(f"Error: {e}")
