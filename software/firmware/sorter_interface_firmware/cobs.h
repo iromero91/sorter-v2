@@ -30,8 +30,8 @@
 extern "C" {
 #endif
 
-int COBS_short_encode_inplace(char* data, int length);
-int COBS_short_decode_inplace(char* data, int length);
+int COBS_decode(const uint8_t *encoded_buf, uint8_t encoded_size, uint8_t *msg_buf, uint8_t msg_buf_size);
+int COBS_encode(const uint8_t *msg_buf, uint8_t msg_size, uint8_t *encoded_buf, uint8_t encoded_buf_size);
 
 #ifdef __cplusplus
 }

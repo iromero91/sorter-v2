@@ -23,49 +23,85 @@
 
 #include "cobs.h"
 
-/**
- * \brief In-place COBS encoding for short packets
- * 
- * Based on the algorith described by Jason Sachs at https://www.embeddedrelated.com/showarticle/113.php
- * The packet must be less than 253 bytes long and start with a "phantom" 0 byte.
- * 
- * @param data Pointer to the data buffer to encode (must start with 0 byte).
- * @param length Length of the data buffer in bytes. (including the intial 0 byte)
- */
 
-int COBS_short_encode_inplace(char* data, int length) {
-    uint8_t *counter = (uint8_t *)data;
-    if (data[0] != 0) return -1; // First byte must be 0
-    if (length > 253) return -1; // Too long for this function
-    *counter = 1;
-    for (int i = 1; i < length; i++) {
-        if (data[i] == 0) {
-            counter = (uint8_t *)&data[i];
-            *counter = 1;
+/** \brief Decode a COBS (Consistent Overhead Byte Stuffing) encoded buffer into the original message.
+ * 
+ *  Only supports messages up to 253 bytes long.
+ * 
+ * \param encoded_buf Pointer to the COBS encoded buffer
+ * \param encoded_size Size of the COBS encoded message in bytes
+ * \param msg_buf Pointer to the output buffer where the decoded message will be stored
+ * \param msg_buf_size Size of the output buffer in bytes
+ * 
+ * \return Number of bytes written to the message buffer on success, -1 if output buffer is too small, -2 if framing error.
+ */
+int COBS_decode(const uint8_t *encoded_buf, uint8_t encoded_size, uint8_t *msg_buf, uint8_t msg_buf_size) {
+    int ret = 0;
+    uint8_t i, counter;
+
+    int msg_size = encoded_size - 1; // Exclude the initial count byte
+    if (msg_size > msg_buf_size) {
+        return -1; // Output buffer too small
+    }
+
+    counter = encoded_buf[0];
+
+    for (i=0; i<msg_size; i++) {
+        uint8_t data_byte = encoded_buf[i+1];
+        if (data_byte == 0) {
+            return -2; // Framing error: stuffed data must have no 0s
+        }
+        if (counter == 1) { // Reached the end of a block, insert zero and take new count
+            msg_buf[i] = 0;
+            counter = data_byte;
         } else {
-            (*counter)++;
+            msg_buf[i] = data_byte;
+            counter--;
         }
     }
-    return 0;
+
+    // Framing error: corrupted count, or message cut short.
+    if (counter > 1) return -2;
+
+    return msg_size;
 }
 
-/**
- * \brief In-place COBS decoding for short packets
+
+/** \brief Encode a message using COBS (Consistent Overhead Byte Stuffing).
  * 
- * Based on the algorith described by Jason Sachs at https://www.embeddedrelated.com/showarticle/113.php
- * The packet must be less than 253 bytes long.
+ *  Only supports messages up to 253 bytes long.
  * 
- * @param data Pointer to the data buffer to decode.
- * @param length Length of the data buffer in bytes.
+ * \param msg_buf Pointer to the original message buffer
+ * \param msg_size Size of the original message in bytes
+ * \param encoded_buf Pointer to the output buffer where the COBS encoded message will be stored
+ * \param encoded_buf_size Size of the output buffer in bytes
+ * 
+ * \return Number of bytes written to the encoded buffer on success, -1 if output buffer is too small, -2 if message is too large to encode.
  */
-int COBS_short_decode_inplace(char* data, int length) {
-    if (length > 253) return -1; // Too long for this function
-    int index = 0;
-    // Replace each counter byte with 0, then skip ahead by the counter value to remove the next 0
-    while (index < length) {
-        uint8_t counter = (uint8_t)data[index];
-        data[index] = 0;
-        index += counter;
+int COBS_encode(const uint8_t *msg_buf, uint8_t msg_size, uint8_t *encoded_buf, uint8_t encoded_buf_size) {
+    uint8_t *counter;
+    uint8_t *encoded_start = encoded_buf;
+    const uint8_t *msg_end;
+    if ((msg_size+2) > encoded_buf_size) {
+        return -1; // Buffer too small, must be able to fit overhead and delimiter
     }
-    return 0;
+    if (msg_size > 253) {
+        return -2; // Message too large
+    }
+    msg_end = msg_buf + msg_size;
+
+    *encoded_buf = 1;
+    counter = encoded_buf;
+    encoded_buf++;
+    // Copy bytes and increment counter until a zero is found, then start a new block by moving the counter variable.
+    while (msg_buf < msg_end){
+        if (*msg_buf == 0){
+            counter = encoded_buf;
+        }
+        *encoded_buf++ = *msg_buf++;
+        (*counter)++;
+    }
+    *encoded_buf++ = 0; // Add delimiter byte
+
+    return encoded_buf - encoded_start;
 }
