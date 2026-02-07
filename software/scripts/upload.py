@@ -5,8 +5,12 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-CLIENT_DIR = ROOT_DIR / "client"
+REPO_ROOT_DIR_PATH = os.getenv(
+    "REPO_ROOT_DIR_PATH",
+    str(Path(__file__).resolve().parents[2]),
+)
+ROOT_DIR = Path(REPO_ROOT_DIR_PATH)
+CLIENT_DIR = ROOT_DIR / "software" / "client"
 if str(CLIENT_DIR) not in sys.path:
     sys.path.insert(0, str(CLIENT_DIR))
 
@@ -14,7 +18,7 @@ from irl.device_discovery import promptForDevice
 from simple_term_menu import TerminalMenu
 
 FIRMWARE_OPTIONS = {
-    "firmware/feeder/arduino.ino": ROOT_DIR / "firmware" / "feeder",
+    "firmware/feeder/arduino.ino": ROOT_DIR / "software" / "firmware" / "feeder" / "arduino.ino",
 }
 
 ARDUINO_FQBN = os.getenv("ARDUINO_FQBN", "arduino:avr:mega")
@@ -48,7 +52,7 @@ def findHexFile(build_dir: Path) -> Path:
     return hex_files[0]
 
 
-def compileSketch(sketch_dir: Path, build_dir: Path) -> Path:
+def compileSketch(sketch_path: Path, build_dir: Path) -> Path:
     cmd = [
         "arduino-cli",
         "compile",
@@ -56,7 +60,7 @@ def compileSketch(sketch_dir: Path, build_dir: Path) -> Path:
         ARDUINO_FQBN,
         "--output-dir",
         str(build_dir),
-        str(sketch_dir),
+        str(sketch_path),
     ]
     result = run(cmd)
     if result.returncode != 0:
@@ -96,11 +100,11 @@ def uploadHex(hex_path: Path, port: str) -> None:
 
 def main() -> int:
     port = promptForDevice("Main MCU", "MAIN_MCU_PATH")
-    sketch_dir = pickFirmware()
+    sketch_path = pickFirmware()
 
     with TemporaryDirectory() as tmp_dir:
         build_dir = Path(tmp_dir)
-        hex_path = compileSketch(sketch_dir, build_dir)
+        hex_path = compileSketch(sketch_path, build_dir)
         uploadHex(hex_path, port)
 
     print("Upload complete")
