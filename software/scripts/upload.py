@@ -18,7 +18,11 @@ from irl.device_discovery import promptForDevice
 from simple_term_menu import TerminalMenu
 
 FIRMWARE_OPTIONS = {
-    "firmware/feeder/arduino.ino": ROOT_DIR / "software" / "firmware" / "feeder" / "arduino.ino",
+    "firmware/feeder/feeder.ino": ROOT_DIR
+    / "software"
+    / "firmware"
+    / "feeder"
+    / "feeder.ino",
 }
 
 ARDUINO_FQBN = os.getenv("ARDUINO_FQBN", "arduino:avr:mega")
@@ -60,7 +64,7 @@ def compileSketch(sketch_path: Path, build_dir: Path) -> Path:
         ARDUINO_FQBN,
         "--output-dir",
         str(build_dir),
-        str(sketch_path),
+        str(sketch_path.parent),
     ]
     result = run(cmd)
     if result.returncode != 0:
