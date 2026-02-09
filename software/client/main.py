@@ -3,6 +3,7 @@ from runtime_variables import mkRuntimeVariables
 from server.api import (
     app,
     broadcastEvent,
+    setGlobalConfig,
     setRuntimeVariables,
     setCommandQueue,
     setController,
@@ -54,6 +55,7 @@ def runBroadcaster(gc: GlobalConfig) -> None:
 
 def main() -> None:
     gc = mkGlobalConfig()
+    setGlobalConfig(gc)
     rv = mkRuntimeVariables(gc)
     setRuntimeVariables(rv)
     setCommandQueue(server_to_main_queue)
