@@ -159,7 +159,11 @@ class Feeding(BaseState):
                 cfg = fc.third_rotor_precision
                 if ACTUALLY_RUN:
                     self.irl.third_c_channel_rotor_stepper.moveSteps(
-                        -cfg.steps_per_pulse, cfg.delay_us
+                        -cfg.steps_per_pulse,
+                        cfg.delay_us,
+                        cfg.accel_start_delay_us,
+                        cfg.accel_steps,
+                        cfg.decel_steps,
                     )
                 if cfg.delay_between_pulse_ms > 0:
                     time.sleep(cfg.delay_between_pulse_ms / 1000.0)
@@ -168,7 +172,11 @@ class Feeding(BaseState):
                 cfg = fc.third_rotor_normal
                 if ACTUALLY_RUN:
                     self.irl.third_c_channel_rotor_stepper.moveSteps(
-                        -cfg.steps_per_pulse, cfg.delay_us
+                        -cfg.steps_per_pulse,
+                        cfg.delay_us,
+                        cfg.accel_start_delay_us,
+                        cfg.accel_steps,
+                        cfg.decel_steps,
                     )
                 if cfg.delay_between_pulse_ms > 0:
                     time.sleep(cfg.delay_between_pulse_ms / 1000.0)
@@ -177,7 +185,11 @@ class Feeding(BaseState):
                 cfg = fc.second_rotor
                 if ACTUALLY_RUN:
                     self.irl.second_c_channel_rotor_stepper.moveSteps(
-                        -cfg.steps_per_pulse, cfg.delay_us
+                        -cfg.steps_per_pulse,
+                        cfg.delay_us,
+                        cfg.accel_start_delay_us,
+                        cfg.accel_steps,
+                        cfg.decel_steps,
                     )
                 if cfg.delay_between_pulse_ms > 0:
                     time.sleep(cfg.delay_between_pulse_ms / 1000.0)
@@ -186,7 +198,11 @@ class Feeding(BaseState):
                 cfg = fc.first_rotor
                 if ACTUALLY_RUN:
                     self.irl.first_c_channel_rotor_stepper.moveSteps(
-                        -cfg.steps_per_pulse, cfg.delay_us
+                        -cfg.steps_per_pulse,
+                        cfg.delay_us,
+                        cfg.accel_start_delay_us,
+                        cfg.accel_steps,
+                        cfg.decel_steps,
                     )
                 if cfg.delay_between_pulse_ms > 0:
                     time.sleep(cfg.delay_between_pulse_ms / 1000.0)

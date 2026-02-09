@@ -14,11 +14,27 @@ class Timeouts:
 class RotorPulseConfig:
     steps_per_pulse: int
     delay_us: int
+    accel_start_delay_us: int
+    accel_steps: int
+    decel_steps: int
     delay_between_pulse_ms: int
 
-    def __init__(self, steps: int, delay_us: int, delay_between_ms: int):
+    def __init__(
+        self,
+        steps: int,
+        delay_us: int,
+        delay_between_ms: int,
+        accel_start_delay_us: int | None = None,
+        accel_steps: int = 0,
+        decel_steps: int | None = None,
+    ):
         self.steps_per_pulse = steps
         self.delay_us = delay_us
+        self.accel_start_delay_us = (
+            delay_us if accel_start_delay_us is None else accel_start_delay_us
+        )
+        self.accel_steps = accel_steps
+        self.decel_steps = accel_steps if decel_steps is None else decel_steps
         self.delay_between_pulse_ms = delay_between_ms
 
 
@@ -34,16 +50,36 @@ class FeederConfig:
 
     def __init__(self):
         self.first_rotor = RotorPulseConfig(
-            steps=200, delay_us=200, delay_between_ms=2000
+            steps=200,
+            delay_us=200,
+            delay_between_ms=2000,
+            accel_start_delay_us=900,
+            accel_steps=48,
+            decel_steps=48,
         )
         self.second_rotor = RotorPulseConfig(
-            steps=500, delay_us=200, delay_between_ms=250
+            steps=500,
+            delay_us=200,
+            delay_between_ms=250,
+            accel_start_delay_us=1200,
+            accel_steps=130,
+            decel_steps=130,
         )
         self.third_rotor_normal = RotorPulseConfig(
-            steps=1000, delay_us=200, delay_between_ms=250
+            steps=1000,
+            delay_us=200,
+            delay_between_ms=250,
+            accel_start_delay_us=1400,
+            accel_steps=220,
+            decel_steps=220,
         )
         self.third_rotor_precision = RotorPulseConfig(
-            steps=100, delay_us=800, delay_between_ms=350
+            steps=100,
+            delay_us=800,
+            delay_between_ms=350,
+            accel_start_delay_us=1400,
+            accel_steps=26,
+            decel_steps=26,
         )
         self.third_channel_dropzone_threshold_px = 350
         self.second_channel_dropzone_threshold_px = 500

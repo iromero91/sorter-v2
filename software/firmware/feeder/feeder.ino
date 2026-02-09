@@ -74,18 +74,45 @@ void processCommand(String cmd) {
       int c1 = args.indexOf(',');
       int c2 = args.indexOf(',', c1 + 1);
       int c3 = args.indexOf(',', c2 + 1);
+      int c4 = args.indexOf(',', c3 + 1);
+      int c5 = c4 == -1 ? -1 : args.indexOf(',', c4 + 1);
+      int c6 = c5 == -1 ? -1 : args.indexOf(',', c5 + 1);
       int step_pin = args.substring(0, c1).toInt();
       int dir_pin = args.substring(c1 + 1, c2).toInt();
       int steps = args.substring(c2 + 1, c3).toInt();
-      int delay_us = args.substring(c3 + 1).toInt();
+      int min_delay_us = c4 == -1 ? args.substring(c3 + 1).toInt() : args.substring(c3 + 1, c4).toInt();
+      int start_delay_us = c4 == -1 ? min_delay_us : args.substring(c4 + 1, c5 == -1 ? args.length() : c5).toInt();
+      int accel_steps = c5 == -1 ? 0 : args.substring(c5 + 1, c6 == -1 ? args.length() : c6).toInt();
+      int decel_steps = c6 == -1 ? accel_steps : args.substring(c6 + 1).toInt();
+
+      if (min_delay_us < 1) min_delay_us = 1;
+      if (start_delay_us < min_delay_us) start_delay_us = min_delay_us;
+      if (accel_steps < 0) accel_steps = 0;
+      if (decel_steps < 0) decel_steps = 0;
 
       digitalWrite(dir_pin, steps >= 0 ? HIGH : LOW);
       int abs_steps = steps >= 0 ? steps : -steps;
+      int accel_zone = accel_steps;
+      int decel_zone = decel_steps;
+      if (accel_zone + decel_zone > abs_steps) {
+        accel_zone = abs_steps / 2;
+        decel_zone = abs_steps - accel_zone;
+      }
+      long delay_delta = (long)start_delay_us - (long)min_delay_us;
+
       for (int i = 0; i < abs_steps; i++) {
+        int step_delay_us = min_delay_us;
+        if (delay_delta > 0 && accel_zone > 0 && i < accel_zone) {
+          step_delay_us = start_delay_us - (int)((delay_delta * (long)(i + 1)) / (long)accel_zone);
+        }
+        if (delay_delta > 0 && decel_zone > 0 && i >= abs_steps - decel_zone) {
+          int decel_index = i - (abs_steps - decel_zone);
+          step_delay_us = min_delay_us + (int)((delay_delta * (long)(decel_index + 1)) / (long)decel_zone);
+        }
         digitalWrite(step_pin, HIGH);
-        delayMicroseconds(delay_us);
+        delayMicroseconds(step_delay_us);
         digitalWrite(step_pin, LOW);
-        delayMicroseconds(delay_us);
+        delayMicroseconds(step_delay_us);
       }
       Serial.print("Stepper ");
       Serial.print(steps);

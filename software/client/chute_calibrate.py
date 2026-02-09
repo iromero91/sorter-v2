@@ -6,7 +6,25 @@ from subsystems.distribution.bin_layout import mkDefaultLayout
 from subsystems.distribution.chute import Chute, BinAddress
 from blob_manager import setStepperPosition
 
-STEP_COUNTS = [1, 10, 50, 100, 200]
+STEP_COUNTS = [
+    1,
+    5,
+    10,
+    25,
+    50,
+    75,
+    100,
+    150,
+    200,
+    250,
+    300,
+    400,
+    500,
+    750,
+    1000,
+    1500,
+    2000,
+]
 
 
 def main():
