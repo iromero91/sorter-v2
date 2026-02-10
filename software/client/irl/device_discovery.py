@@ -1,7 +1,7 @@
 import os
 import sys
 from serial.tools import list_ports
-from simple_term_menu import TerminalMenu
+from utils.pick_menu import pickMenu
 
 
 def listAvailableDevices() -> list[str]:
@@ -32,8 +32,7 @@ def promptForDevice(device_name: str, env_var_name: str) -> str:
         options.append(device)
 
     print(f"\nSelect {device_name}:")
-    menu = TerminalMenu(options)
-    choice_index = menu.show()
+    choice_index = pickMenu(options)
 
     if choice_index is None:
         print("Selection cancelled")

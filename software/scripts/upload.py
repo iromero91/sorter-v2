@@ -15,7 +15,7 @@ if str(CLIENT_DIR) not in sys.path:
     sys.path.insert(0, str(CLIENT_DIR))
 
 from irl.device_discovery import promptForDevice
-from simple_term_menu import TerminalMenu
+from utils.pick_menu import pickMenu
 
 FIRMWARE_OPTIONS = {
     "firmware/feeder/feeder.ino": ROOT_DIR
@@ -38,8 +38,7 @@ def run(cmd: list[str]) -> subprocess.CompletedProcess:
 
 def pickFirmware() -> Path:
     options = list(FIRMWARE_OPTIONS.keys())
-    menu = TerminalMenu(options)
-    choice_index = menu.show()
+    choice_index = pickMenu(options)
     if choice_index is None:
         print("Selection cancelled")
         sys.exit(1)
