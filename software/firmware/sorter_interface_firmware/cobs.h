@@ -30,6 +30,9 @@
 extern "C" {
 #endif
 
+/** Maximum size of a message to encode or decode using COBS */
+#define COBS_MAX_MESSAGE_SIZE 254
+
 int COBS_decode(const uint8_t *encoded_buf, uint8_t encoded_size, uint8_t *msg_buf, uint8_t msg_buf_size);
 int COBS_encode(const uint8_t *msg_buf, uint8_t msg_size, uint8_t *encoded_buf, uint8_t encoded_buf_size);
 

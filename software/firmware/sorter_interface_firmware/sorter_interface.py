@@ -127,7 +127,7 @@ class SorterInterfaceCard:
     
     def stepper_is_stopped(self, channel: int) -> bool:
         res = self.send_command(CommandCodes.CMD_STEPPER_IS_STOPPED, channel, b'')
-        response_bool = struct.unpack('<I', res.payload)[0]
+        response_bool = struct.unpack('?', res.payload)[0]
         return bool(response_bool)
 
     def stepper_set_speed_limits(self, channel: int, min_speed: int, max_speed: int) -> None:
@@ -141,13 +141,13 @@ class SorterInterfaceCard:
     def stepper_move_steps(self, channel: int, steps: int) -> None:
         payload = struct.pack('<i', steps)
         res = self.send_command(CommandCodes.CMD_STEPPER_MOVE_STEPS, channel, payload)
-        response_bool = struct.unpack('<I', res.payload)[0]
+        response_bool = struct.unpack('?', res.payload)[0]
         return response_bool
     
     def stepper_move_at_speed(self, channel: int, speed: int) -> None:
         payload = struct.pack('<i', speed)
         res = self.send_command(CommandCodes.CMD_STEPPER_MOVE_AT_SPEED, channel, payload)
-        response_bool = struct.unpack('<I', res.payload)[0]
+        response_bool = struct.unpack('?', res.payload)[0]
         return response_bool
     
 
@@ -159,7 +159,7 @@ if __name__ == "__main__":
         sys.exit(1)
     port = sys.argv[1]
     bus = SorterInterfaceBus(port)
-    card = SorterInterfaceCard(bus, address=1)
+    card = SorterInterfaceCard(bus, address=0)
     start_time = time.monotonic()
     message_count = DBG_MESSAGE_COUNT
     try:

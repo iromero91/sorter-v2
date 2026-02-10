@@ -99,6 +99,132 @@ enum CommandCodes {
     CMD_BAD_COMMAND = 0xFF
 };
 
+typedef void (*CommandHandler)(const Message* msg, Message* resp);
+typedef bool (*ChannelValidator)(uint8_t channel);
+
+struct CommandEntry {
+    const char *name; // For debugging and self-documentation purposes.
+    const char *arg_type; // In python stuct format, e.g. "B" for uint8_t, "i" for int32_t, etc.
+    const char *ret_type; // In python stuct format, e.g. "B" for uint8_t, "i" for int32_t, etc.
+    uint8_t payload_length; // Expected payload length for this command 255 if variable, 0 if no payload
+    ChannelValidator channel_validator; // Optional function to validate the channel field of the message, can be NULL if no validation needed
+    CommandHandler handler;
+};
+
+struct CommandTable {
+    const char *prefix;
+    CommandEntry commands[16];
+};
+
+void CMDH_init(const Message* msg, Message* resp);
+void CMDH_ping(const Message* msg, Message* resp);
+void CMDH_stepper_move_steps(const Message* msg, Message* resp);
+void CMDH_stepper_move_at_speed(const Message* msg, Message* resp);
+void CMDH_stepper_set_speed_limits(const Message* msg, Message* resp);
+void CMDH_stepper_set_acceleration(const Message* msg, Message* resp);
+void CMDH_stepper_is_stopped(const Message* msg, Message* resp);
+void CMDH_stepper_get_position(const Message* msg, Message* resp);
+void CMDH_stepper_set_position(const Message* msg, Message* resp);
+void CMDH_stepper_home(const Message* msg, Message* resp);
+void CMDH_stepper_drv_set_enabled(const Message* msg, Message* resp);
+void CMDH_stepper_drv_set_microsteps(const Message* msg, Message* resp);
+void CMDH_stepper_drv_set_current(const Message* msg, Message* resp);
+void CMDH_stepper_drv_read_register(const Message* msg, Message* resp);
+void CMDH_stepper_drv_write_register(const Message* msg, Message* resp);
+void CMDH_digital_read(const Message* msg, Message* resp);
+void CMDH_digital_write(const Message* msg, Message* resp);
+bool VAL_stepper_channel(uint8_t channel);
+bool VAL_digital_out_channel(uint8_t channel);
+bool VAL_digital_in_channel(uint8_t channel);
+
+const struct CommandTable baseCmdTable = {
+    .prefix = NULL,
+    .commands = {
+        { "INIT", "", "", 0, NULL, CMDH_init },
+        { "PING", "", "", 0, NULL, CMDH_ping },
+    }
+};
+
+const struct CommandTable stepperCmdTable = {
+    .prefix = "STEPPER",
+    .commands = {
+        { "MOVE_STEPS", "i", "?", 4, VAL_stepper_channel, CMDH_stepper_move_steps },
+        { "MOVE_AT_SPEED", "i", "?", 4, VAL_stepper_channel, CMDH_stepper_move_at_speed },
+        { "SET_SPEED_LIMITS", "II", "", 8, VAL_stepper_channel, CMDH_stepper_set_speed_limits },
+        { "SET_ACCELERATION", "I", "", 4, VAL_stepper_channel, CMDH_stepper_set_acceleration },
+        { "IS_STOPPED", "", "B", 0, VAL_stepper_channel, CMDH_stepper_is_stopped },
+        { "GET_POSITION", "", "i", 0, VAL_stepper_channel, CMDH_stepper_get_position },
+        { "SET_POSITION", "i", "", 4, VAL_stepper_channel, CMDH_stepper_set_position },
+        { "HOME", "iBB", "", 6, VAL_stepper_channel, CMDH_stepper_home },
+    }
+};
+
+const struct CommandTable stepperDrvCmdTable = {
+    .prefix = "STEPPER_DRV",
+    .commands = {
+        { "SET_ENABLED", "B", "", 1, VAL_stepper_channel, CMDH_stepper_drv_set_enabled },
+        { "SET_MICROSTEPS", "H", "", 1, VAL_stepper_channel, CMDH_stepper_drv_set_microsteps },
+        { "SET_CURRENT", "BBB", "", 3, VAL_stepper_channel, CMDH_stepper_drv_set_current },
+        {NULL, NULL, NULL, 0, NULL, NULL},
+        {NULL, NULL, NULL, 0, NULL, NULL},
+        {NULL, NULL, NULL, 0, NULL, NULL},
+        {NULL, NULL, NULL, 0, NULL, NULL},
+        {NULL, NULL, NULL, 0, NULL, NULL},
+        { "READ_REGISTER", "B", "I", 1, VAL_stepper_channel, CMDH_stepper_drv_read_register },
+        { "WRITE_REGISTER", "BI", "", 5, VAL_stepper_channel, CMDH_stepper_drv_write_register },
+    }
+};
+
+const struct CommandTable digitalIoCmdTable = {
+    .prefix = "DIGITAL_IO",
+    .commands = {
+        { "READ", "B", "B", 1, VAL_digital_in_channel, CMDH_digital_read },
+        { "WRITE", "BB", "", 2, VAL_digital_out_channel, CMDH_digital_write },
+    }
+};
+
+const struct CommandTable* command_tables[7] = {
+    &baseCmdTable,
+    &stepperCmdTable,
+    &stepperDrvCmdTable,
+    &digitalIoCmdTable
+};
+
+const int MAX_PAYLOAD_SIZE = COBS_MAX_MESSAGE_SIZE - 4 - 4; // 254 - 4 bytes of header - 4 bytes of CRC
+
+
+/** \brief Handle an incoming command message and produce a response.
+ * This function decodes the command and dispatches it to the appropriate handler function. 
+ * It also handles common error cases like invalid commands or payload lengths or invalid channels 
+ * and produces appropriate error responses.
+ * 
+ * \param msg Pointer to the incoming message to handle
+ * \param resp Pointer to the message struct to write the response to. The handler functions will set 
+ * all fields of this struct.
+ */
+void CMD_handle_message(const Message* msg, Message* resp) {
+    uint8_t table_index = (msg->command & 0x70) >> 4;
+    uint8_t command_index = msg->command & 0x0F;
+    resp->dev_address = msg->dev_address; // By default, we set the response address to be the same as the request, handlers can change this if needed
+    resp->command = msg->command; // By default, we set the response command to be the same as the request, handlers can change this if needed
+    if (command_tables[table_index] == NULL || command_tables[table_index]->commands[command_index].handler == NULL) {
+        resp->command = CMD_BAD_COMMAND;
+        resp->payload_length = snprintf((char*)resp->payload, 246, "Invalid command %d", msg->command);
+        return;
+    }
+    const CommandEntry* entry = &command_tables[table_index]->commands[command_index];
+    if (entry->payload_length != 255 && msg->payload_length != entry->payload_length) {
+        resp->command = msg->command | 0x80; // Set error bit
+        resp->payload_length = snprintf((char*)resp->payload, 246, "%s: Invalid payload length %d, expected %d", entry->name, msg->payload_length, entry->payload_length);
+        return;
+    }
+    if (entry->channel_validator != NULL && !entry->channel_validator(msg->channel)) {
+        resp->command = msg->command | 0x80; // Set error bit
+        resp->payload_length = snprintf((char*)resp->payload, 246, "%s: Invalid channel %d", entry->name, msg->channel);
+        return;
+    }
+    entry->handler(msg, resp);
+}
 
 // End break
 
@@ -132,7 +258,7 @@ TMC2209 tmc_drivers[] = {
 };
 Stepper steppers[] = {
     Stepper(28, 27),
-    Stepper(26, 25),
+    Stepper(26, 22),
     Stepper(21, 20),
     Stepper(19, 18)
 };
@@ -181,6 +307,189 @@ int dump_configuration(char * buf, size_t buf_size) {
     return n_bytes;
 }
 
+/** \brief Initialize all hardware components, including GPIOs, UART, stepper drivers, etc.
+ * This function is called once at startup to set up the hardware for operation. It configures the TMC2209 drivers,
+ * initializes the stepper objects, and sets up the GPIO pins for digital inputs and outputs.
+ */
+void initialize_hardware() {
+    // Initialize TMC UART bus
+    tmc_bus.setupComm(TMC_UART_BAUDRATE, TMC_UART_TX_PIN, TMC_UART_RX_PIN);
+    // Initialize TMC2209 drivers and steppers
+    for (int i = 0; i < STEPPER_COUNT; i++) {
+        //tmc_drivers[i].enableDriver(true);
+        steppers[i].initialize();
+        steppers[i].setAcceleration(20000);
+        steppers[i].setSpeedLimits(16, 4000);
+        tmc_drivers[i].initialize();
+        tmc_drivers[i].enableDriver(true);
+        tmc_drivers[i].setCurrent(31, 16, 10);
+        tmc_drivers[i].setMicrosteps(MICROSTEP_8);
+        tmc_drivers[i].enableStealthChop(true); 
+    }
+    // Global enable for stepper drivers
+    gpio_init(STEPPER_nEN_PIN);
+    gpio_set_dir(STEPPER_nEN_PIN, GPIO_OUT);
+    gpio_put(STEPPER_nEN_PIN, 0); // Enable stepper drivers
+    // Initialize digital inputs
+    for (int i = 0; i < DIGITAL_INPUT_COUNT; i++) {
+        gpio_init(digital_input_pins[i]);
+        gpio_set_dir(digital_input_pins[i], GPIO_IN);
+        gpio_pull_up(digital_input_pins[i]);
+    }
+    // Initialize digital outputs
+    for (int i = 0; i < DIGITAL_OUTPUT_COUNT; i++) {
+        gpio_init(digital_output_pins[i]);
+        gpio_set_dir(digital_output_pins[i], GPIO_OUT);
+        gpio_put(digital_output_pins[i], 0);
+    }
+}
+
+void CMDH_init(const Message* msg, Message* resp) {
+    initialize_hardware();
+    resp->payload_length = dump_configuration((char*)resp->payload, MAX_PAYLOAD_SIZE);
+}
+
+void CMDH_ping(const Message* msg, Message* resp) {
+    // Echo back the payload from the message into the response
+    memcpy(resp->payload, msg->payload, msg->payload_length);
+    resp->payload_length = msg->payload_length;
+}
+
+bool VAL_stepper_channel(uint8_t channel) {
+    return channel < STEPPER_COUNT;
+}
+
+void CMDH_stepper_move_steps(const Message* msg, Message* resp) {
+    int32_t distance = *(int32_t*)msg->payload;
+    bool result = steppers[msg->channel].moveSteps(distance);
+    resp->payload[0] = result ? 1 : 0;
+    resp->payload_length = 1;
+}
+
+void CMDH_stepper_move_at_speed(const Message* msg, Message* resp) {
+    int32_t speed = *(int32_t*)msg->payload;
+    bool result = steppers[msg->channel].moveAtSpeed(speed);
+    resp->payload[0] = result ? 1 : 0;
+    resp->payload_length = 1;
+}
+
+
+bool VAL_digital_out_channel(uint8_t channel) {
+    return channel < DIGITAL_OUTPUT_COUNT;
+}
+
+bool VAL_digital_in_channel(uint8_t channel) {
+    return channel < DIGITAL_INPUT_COUNT;
+}
+
+void CMDH_digital_read(const Message* msg, Message* resp) {
+    int pin = digital_input_pins[msg->channel];
+    bool value = gpio_get(pin);
+    resp->payload[0] = value ? 1 : 0;
+    resp->payload_length = 1;
+}
+
+void CMDH_digital_write(const Message* msg, Message* resp) {
+    int pin = digital_output_pins[msg->channel];
+    bool value = msg->payload[0] != 0;
+    gpio_put(pin, value ? 1 : 0);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_set_speed_limits(const Message* msg, Message* resp) {
+    uint32_t min_speed = ((uint32_t*)msg->payload)[0];
+    uint32_t max_speed = ((uint32_t*)msg->payload)[1];
+    steppers[msg->channel].setSpeedLimits(min_speed, max_speed);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_set_acceleration(const Message* msg, Message* resp) {
+    uint32_t acceleration = ((uint32_t*)msg->payload)[0];
+    steppers[msg->channel].setAcceleration(acceleration);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_is_stopped(const Message* msg, Message* resp) {
+    bool is_stopped = steppers[msg->channel].isStopped();
+    resp->payload[0] = is_stopped ? 1 : 0;
+    resp->payload_length = 1;
+}
+
+void CMDH_stepper_get_position(const Message* msg, Message* resp) {
+    int32_t position = steppers[msg->channel].getPosition();
+    ((int32_t*)resp->payload)[0] = position;
+    resp->payload_length = 4;
+}
+
+void CMDH_stepper_set_position(const Message* msg, Message* resp) {
+    int32_t position = ((int32_t*)msg->payload)[0];
+    steppers[msg->channel].setPosition(position);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_home(const Message* msg, Message* resp) {
+    int32_t home_speed = ((int32_t*)msg->payload)[0];
+    uint8_t home_pin = msg->payload[4];
+    bool home_pin_polarity = msg->payload[5] != 0;
+    steppers[msg->channel].home(home_speed, home_pin, home_pin_polarity);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_drv_set_enabled(const Message* msg, Message* resp) {
+    bool enabled = msg->payload[0] != 0;
+    tmc_drivers[msg->channel].enableDriver(enabled);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_drv_set_microsteps(const Message* msg, Message* resp) {
+    uint16_t arg_microsteps = ((uint16_t*)msg->payload)[0];
+    TMC2209_Microstep microsteps;
+    switch (arg_microsteps) {
+        case 256: microsteps = MICROSTEP_256; break;
+        case 128: microsteps = MICROSTEP_128; break;
+        case 64: microsteps = MICROSTEP_64; break;
+        case 32: microsteps = MICROSTEP_32; break;
+        case 16: microsteps = MICROSTEP_16; break;
+        case 8: microsteps = MICROSTEP_8; break;
+        case 4: microsteps = MICROSTEP_4; break;
+        case 2: microsteps = MICROSTEP_2; break;
+        case 1: microsteps = MICROSTEP_FULL; break;
+        default:
+            resp->command = msg->command | 0x80; // Set error bit
+            resp->payload_length = snprintf((char*)resp->payload, 246, "Invalid microstep value %d", arg_microsteps);
+            return;
+    }
+    tmc_drivers[msg->channel].setMicrosteps(microsteps);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_drv_set_current(const Message* msg, Message* resp) {
+    uint8_t run_current = msg->payload[0];
+    uint8_t hold_current = msg->payload[1];
+    uint8_t hold_delay = msg->payload[2];
+    tmc_drivers[msg->channel].setCurrent(run_current, hold_current, hold_delay);
+    resp->payload_length = 0;
+}
+
+void CMDH_stepper_drv_read_register(const Message* msg, Message* resp) {
+    uint8_t reg = msg->payload[0];
+    uint32_t value;
+    int result = tmc_drivers[msg->channel].readRegister(reg, &value);
+    if (result != 0) {
+        resp->command = msg->command | 0x80; // Set error bit
+        resp->payload_length = snprintf((char*)resp->payload, 246, "Failed to read register %d", reg);
+        return;
+    }
+    ((uint32_t*)resp->payload)[0] = value;
+    resp->payload_length = 4;
+}
+
+void CMDH_stepper_drv_write_register(const Message* msg, Message* resp) {
+    uint8_t reg = msg->payload[0];
+    uint32_t value = ((uint32_t*)msg->payload)[1];
+    tmc_drivers[msg->channel].writeRegister(reg, value);
+    resp->payload_length = 0;
+}
 
 const uint32_t STEP_TICK_PERIOD_US = 1000000 / STEP_TICK_RATE_HZ;
 const uint32_t MOTION_UPDATE_PERIOD_US = 1000000 / STEP_MOTION_UPDATE_RATE_HZ;
@@ -226,38 +535,6 @@ void core1_entry() {
 }
 
 
-void initialize_hardware() {
-    // Initialize TMC UART bus
-    tmc_bus.setupComm(TMC_UART_BAUDRATE, TMC_UART_TX_PIN, TMC_UART_RX_PIN);
-    // Initialize TMC2209 drivers and steppers
-    for (int i = 0; i < STEPPER_COUNT; i++) {
-        //tmc_drivers[i].enableDriver(true);
-        steppers[i].initialize();
-        steppers[i].setAcceleration(20000);
-        steppers[i].setSpeedLimits(16, 4000);
-        tmc_drivers[i].initialize();
-        tmc_drivers[i].enableDriver(true);
-        tmc_drivers[i].setCurrent(31, 16, 10);
-        tmc_drivers[i].setMicrosteps(MICROSTEP_8);
-        tmc_drivers[i].enableStealthChop(true); 
-    }
-    // Global enable for stepper drivers
-    gpio_init(STEPPER_nEN_PIN);
-    gpio_set_dir(STEPPER_nEN_PIN, GPIO_OUT);
-    gpio_put(STEPPER_nEN_PIN, 0); // Enable stepper drivers
-    // Initialize digital inputs
-    for (int i = 0; i < DIGITAL_INPUT_COUNT; i++) {
-        gpio_init(digital_input_pins[i]);
-        gpio_set_dir(digital_input_pins[i], GPIO_IN);
-        gpio_pull_up(digital_input_pins[i]);
-    }
-    // Initialize digital outputs
-    for (int i = 0; i < DIGITAL_OUTPUT_COUNT; i++) {
-        gpio_init(digital_output_pins[i]);
-        gpio_set_dir(digital_output_pins[i], GPIO_OUT);
-        gpio_put(digital_output_pins[i], 0);
-    }
-}
 
 
 int main()
@@ -332,247 +609,7 @@ int main()
             // Here we would escape if the device address doesnt match, but we ignore it in USB
             // Prepare response message
             struct Message* resp = (struct Message*)tx_message;
-            resp->dev_address = msg->dev_address; // We respond to the address
-            resp->channel = msg->channel; // We respond on the same channel
-            switch (msg->command) {
-                case CMD_INIT:
-                    resp->command = CMD_INIT;
-                    // Stop all steppers
-                    for (int i = 0; i < STEPPER_COUNT; i++) {
-                        steppers[i].moveAtSpeed(0);
-                    }
-                    // Turn off all digital outputs
-                    for (int i = 0; i < DIGITAL_OUTPUT_COUNT; i++) {
-                        gpio_put(digital_output_pins[i], 0);
-                    }
-                    resp->payload_length = dump_configuration((char*)resp->payload, 246);
-                    break;
-                case CMD_PING:
-                    resp->command = CMD_PING;
-                    // Copy payload back
-                    resp->payload_length = msg->payload_length;
-                    memcpy(resp->payload, msg->payload, msg->payload_length);
-                    break;
-                case CMD_STEPPER_MOVE_STEPS:
-                    if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        int32_t distance = *((int32_t*)msg->payload);
-                        resp->command = msg->command;
-                        resp->payload_length = 4;
-                        bool res = steppers[stepper_id].moveSteps(distance);
-                        *((uint32_t*)resp->payload) = res ? 1 : 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_MOVE_AT_SPEED:
-                    if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        int32_t speed = *((int32_t*)msg->payload);
-                        resp->command = msg->command;
-                        resp->payload_length = 4;
-                        bool res = steppers[stepper_id].moveAtSpeed(speed);
-                        *((uint32_t*)resp->payload) = res ? 1 : 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_SET_SPEED_LIMITS:
-                    if (msg->payload_length == 8 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        uint32_t min_speed = *((uint32_t*)msg->payload);
-                        uint32_t max_speed = *((uint32_t*)(msg->payload + 4));
-                        steppers[stepper_id].setSpeedLimits(min_speed, max_speed);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_SET_ACCELERATION:
-                    if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        uint32_t acceleration = *((uint32_t*)msg->payload);
-                        steppers[stepper_id].setAcceleration(acceleration);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_IS_STOPPED:
-                    if (msg->payload_length == 0 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        resp->command = msg->command;
-                        resp->payload_length = 4;
-                        bool res = steppers[stepper_id].isStopped();
-                        *((uint32_t*)resp->payload) = res ? 1 : 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_GET_POSITION:
-                    if (msg->payload_length == 0 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        resp->command = msg->command;
-                        resp->payload_length = 4;
-                        int32_t position = steppers[stepper_id].getPosition();
-                        *((int32_t*)resp->payload) = position;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_SET_POSITION:
-                    if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        int32_t position = *((int32_t*)msg->payload);
-                        steppers[stepper_id].setPosition(position);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_HOME:
-                    if (msg->payload_length == 12 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        int32_t home_speed = *((int32_t*)msg->payload);
-                        int home_pin = *((int32_t*)(msg->payload + 4));
-                        bool home_pin_polarity = msg->payload[8] != 0;
-                        // Convert homing pin from channel number to actual GPIO pin
-                        if (home_pin >= DIGITAL_INPUT_COUNT) {
-                            resp->command = msg->command | 0x80; // Exception, bad arguments
-                            resp->payload_length = 0;
-                            break;
-                        }
-                        home_pin = digital_input_pins[home_pin];
-                        steppers[stepper_id].home(home_speed, home_pin, home_pin_polarity);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_DRV_SET_ENABLED:
-                   if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        bool enabled = *((uint32_t*)msg->payload) != 0;
-                        tmc_drivers[stepper_id].enableDriver(enabled);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_DRV_SET_MICROSTEPS:
-                    if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        uint32_t microsteps = *((uint32_t*)msg->payload);
-                        switch (microsteps) {
-                            case 1: tmc_drivers[stepper_id].setMicrosteps(MICROSTEP_FULL); break;
-                            case 2: tmc_drivers[stepper_id].setMicrosteps(MICROSTEP_2); break;
-                            case 4: tmc_drivers[stepper_id].setMicrosteps(MICROSTEP_4); break;
-                            case 8: tmc_drivers[stepper_id].setMicrosteps(MICROSTEP_8); break;
-                            case 16: tmc_drivers[stepper_id].setMicrosteps(MICROSTEP_16); break;
-                            case 32: tmc_drivers[stepper_id].setMicrosteps(MICROSTEP_32); break;
-                            default:
-                                resp->command = msg->command | 0x80; // Exception, bad arguments
-                                resp->payload_length = 0;
-                                continue;
-                        }
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_DRV_SET_CURRENT:
-                    if (msg->payload_length == 12 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        uint32_t run_current = *((uint32_t*)msg->payload);
-                        uint32_t hold_current = *((uint32_t*)(msg->payload + 4));
-                        uint32_t hold_delay = *((uint32_t*)(msg->payload + 8));
-                        tmc_drivers[stepper_id].setCurrent(run_current, hold_current, hold_delay);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_DRV_READ_REGISTER:
-                    if (msg->payload_length == 4 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        uint32_t reg_addr = *((uint32_t*)msg->payload);
-                        uint32_t reg_value;
-                        int res = tmc_drivers[stepper_id].readRegister(reg_addr, &reg_value);
-                        resp->command = msg->command;
-                        if (res < 0) {
-                            resp->command |= 0x80; // Exception, read error
-                            resp->payload_length = 0;
-                        } else {
-                            resp->payload_length = 4;
-                            *((uint32_t*)resp->payload) = reg_value;
-                        }
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_STEPPER_DRV_WRITE_REGISTER:
-                    if (msg->payload_length == 8 && msg->channel < STEPPER_COUNT) {
-                        uint8_t stepper_id = msg->channel;
-                        uint32_t reg_addr = *((uint32_t*)msg->payload);
-                        uint32_t reg_value = *((uint32_t*)(msg->payload + 4));
-                        tmc_drivers[stepper_id].writeRegister(reg_addr, reg_value);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_DIGITAL_READ:
-                    if (msg->payload_length == 0 && msg->channel < DIGITAL_INPUT_COUNT) {
-                        uint8_t input_id = msg->channel;
-                        int pin = digital_input_pins[input_id];
-                        bool value = gpio_get(pin) != 0;
-                        resp->command = msg->command;
-                        resp->payload_length = 4;
-                        *((uint32_t*)resp->payload) = value ? 1 : 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                case CMD_DIGITAL_WRITE:
-                    if (msg->payload_length == 4 && msg->channel < DIGITAL_OUTPUT_COUNT) {
-                        uint8_t output_id = msg->channel;
-                        bool value = *((uint32_t*)msg->payload) != 0;
-                        int pin = digital_output_pins[output_id];
-                        gpio_put(pin, value ? 1 : 0);
-                        resp->command = msg->command;
-                        resp->payload_length = 0;
-                    } else {
-                        resp->command = msg->command | 0x80; // Exception, bad arguments
-                        resp->payload_length = 0;
-                    }
-                    break;
-                default:
-                    resp->command = CMD_BAD_COMMAND; // Exception, bad command
-                    resp->payload_length = 0;
-                    break;
-            }
+            CMD_handle_message(msg, resp);
             // Calculate total response length
             int resp_len = 4 + resp->payload_length; // Header + payload
             // Append CRC
