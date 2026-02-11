@@ -5,9 +5,10 @@ import json
 import cv2
 import numpy as np
 import requests
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from global_config import GlobalConfig
+from logger import LogEntry
 
 
 class Telemetry:
@@ -73,3 +74,31 @@ class Telemetry:
             requests.post(url, data=data, files=files, timeout=30)
         except Exception as e:
             self.gc.logger.error(f"telemetry upload failed: {e}")
+
+    def uploadLogs(self, log_entries: List[LogEntry]) -> None:
+        if not self.gc.telemetry_enabled or not log_entries:
+            return
+
+        entries_data = []
+        for entry in log_entries:
+            entries_data.append(
+                {
+                    "timestamp": entry.timestamp,
+                    "level": entry.level,
+                    "message": entry.message,
+                }
+            )
+
+        data = {
+            "machine_id": self.gc.machine_id,
+            "run_id": self.gc.run_id,
+            "entries": json.dumps(entries_data),
+        }
+
+        try:
+            url = f"{self.gc.telemetry_url.rstrip('/')}/logs"
+            requests.post(url, data=data, timeout=30)
+        except Exception as e:
+            print(
+                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ERROR] log upload failed: {e}"
+            )

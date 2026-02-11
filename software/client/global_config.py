@@ -104,12 +104,14 @@ class GlobalConfig:
     should_profile_feeder: bool
     telemetry_enabled: bool
     telemetry_url: str
+    log_buffer_size: int
 
     def __init__(self):
         self.debug_level = 0
         self.vision_mask_proximity_threshold = 0.5
         self.should_write_camera_feeds = False
         self.should_profile_feeder = False
+        self.log_buffer_size = 100
 
 
 def mkTimeouts() -> Timeouts:
@@ -125,7 +127,7 @@ def mkFeederConfig() -> FeederConfig:
 def mkGlobalConfig() -> GlobalConfig:
     gc = GlobalConfig()
     gc.debug_level = int(os.getenv("DEBUG_LEVEL", "0"))
-    gc.logger = Logger(gc.debug_level)
+    gc.log_buffer_size = int(os.getenv("LOG_BUFFER_SIZE", "100"))
     gc.timeouts = mkTimeouts()
     gc.feeder_config = mkFeederConfig()
     gc.classification_chamber_vision_model_path = os.environ[
@@ -137,4 +139,10 @@ def mkGlobalConfig() -> GlobalConfig:
     gc.run_id = str(uuid.uuid4())
     gc.telemetry_enabled = os.getenv("TELEMETRY_ENABLED", "0") == "1"
     gc.telemetry_url = os.getenv("TELEMETRY_URL", "https://api.basically.website")
+
+    from telemetry import Telemetry
+
+    telemetry = Telemetry(gc)
+    gc.logger = Logger(gc.debug_level, gc.log_buffer_size, telemetry.uploadLogs)
+
     return gc
