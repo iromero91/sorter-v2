@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import json
 from datetime import datetime, timezone
 
 import uvicorn
@@ -29,7 +30,7 @@ async def createCapture(
     annotated_img: UploadFile = File(...),
     segmentation_data: Optional[UploadFile] = File(None),
 ):
-    capture_dir = os.path.join(gc.img_dir, machine_id, run_id)
+    capture_dir = os.path.join(gc.data_dir, machine_id, run_id)
     os.makedirs(capture_dir, exist_ok=True)
 
     raw_name = raw_img.filename
@@ -65,8 +66,45 @@ async def createCapture(
     return {"id": id}
 
 
+@app.post("/logs")
+async def uploadLogs(
+    machine_id: str = Form(...),
+    run_id: str = Form(...),
+    entries: str = Form(...),
+):
+    log_dir = os.path.join(gc.data_dir, machine_id, run_id, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    
+    log_entries = json.loads(entries)
+    
+    current_part = 1
+    max_file_size = 1024 * 1024  # 1MB per log file
+    
+    while True:
+        log_filename = f"logs_part_{current_part:03d}.txt"
+        log_path = os.path.join(log_dir, log_filename)
+        
+        if not os.path.exists(log_path):
+            break
+        
+        if os.path.getsize(log_path) < max_file_size:
+            break
+        
+        current_part += 1
+    
+    log_path = os.path.join(log_dir, f"logs_part_{current_part:03d}.txt")
+    
+    with open(log_path, "a", encoding="utf-8") as f:
+        for entry in log_entries:
+            timestamp_str = datetime.fromtimestamp(entry["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"[{timestamp_str}] [{entry['level']}] {entry['message']}\n")
+    
+    return {"success": True, "part": current_part}
+
+
 def main():
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

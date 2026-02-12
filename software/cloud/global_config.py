@@ -1,9 +1,12 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class GlobalConfig:
     db_path: str
-    img_dir: str
+    data_dir: str
 
     def __init__(self):
         pass
@@ -12,5 +15,5 @@ class GlobalConfig:
 def mkGlobalConfig() -> GlobalConfig:
     gc = GlobalConfig()
     gc.db_path = os.environ["DB_PATH"]
-    gc.img_dir = os.environ["IMG_DIR"]
+    gc.data_dir = os.environ["DATA_DIR"]
     return gc

@@ -150,6 +150,7 @@ def main() -> None:
         irl.mcu.flush()
         irl.mcu.close()
         gc.logger.info("Cleanup complete")
+        gc.logger.flushLogs()
         sys.exit(0)
 
 
