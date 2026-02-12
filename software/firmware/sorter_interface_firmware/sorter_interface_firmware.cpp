@@ -68,37 +68,6 @@ struct Message {
     uint8_t payload[]; // Payload data
 };
 
-enum CommandCodes {
-    // Common Commands
-    CMD_INIT = 0x01,
-    CMD_PING = 0x02,
-    // Stepper Commands
-    CMD_STEPPER_MOVE_STEPS = 0x10,
-    CMD_STEPPER_MOVE_AT_SPEED = 0x11,
-    CMD_STEPPER_SET_SPEED_LIMITS = 0x12,
-    CMD_STEPPER_SET_ACCELERATION = 0x13,
-    CMD_STEPPER_IS_STOPPED = 0x14,
-    CMD_STEPPER_GET_POSITION = 0x15,
-    CMD_STEPPER_SET_POSITION = 0x16,
-    CMD_STEPPER_HOME = 0x17,
-    // Stepper driver commands
-    CMD_STEPPER_DRV_SET_ENABLED = 0x20,
-    CMD_STEPPER_DRV_SET_MICROSTEPS = 0x21,
-    CMD_STEPPER_DRV_SET_CURRENT = 0x22,
-    CMD_STEPPER_DRV_READ_REGISTER = 0x2e,
-    CMD_STEPPER_DRV_WRITE_REGISTER = 0x2f,
-    // Digital I/O Commands
-    CMD_DIGITAL_READ = 0x30,
-    CMD_DIGITAL_WRITE = 0x31,
-    // Servo Commands
-    CMD_SERVO_SET_ENABLED = 0x40,
-    CMD_SERVO_MOVE_TO = 0x41,
-    CMD_SERVO_SET_SPEED_LIMITS = 0x42,
-    CMD_SERVO_SET_ACCELERATION = 0x43,
-
-    CMD_BAD_COMMAND = 0xFF
-};
-
 typedef void (*CommandHandler)(const Message* msg, Message* resp);
 typedef bool (*ChannelValidator)(uint8_t channel);
 
@@ -208,7 +177,7 @@ void CMD_handle_message(const Message* msg, Message* resp) {
     resp->dev_address = msg->dev_address; // By default, we set the response address to be the same as the request, handlers can change this if needed
     resp->command = msg->command; // By default, we set the response command to be the same as the request, handlers can change this if needed
     if (command_tables[table_index] == NULL || command_tables[table_index]->commands[command_index].handler == NULL) {
-        resp->command = CMD_BAD_COMMAND;
+        resp->command = msg->command | 0x80; // Set error bit
         resp->payload_length = snprintf((char*)resp->payload, 246, "Invalid command %d", msg->command);
         return;
     }
