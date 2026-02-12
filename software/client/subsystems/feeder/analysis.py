@@ -156,7 +156,6 @@ def analyzeFeederState(
                 obj_dm,
                 channels.second_aruco_pos,
                 fc.third_channel_dropzone_threshold_px,
-                True,
             ):
                 has_object_in_3_2_dropzone = True
 
@@ -166,7 +165,6 @@ def analyzeFeederState(
                 obj_dm,
                 channels.first_aruco_pos,
                 fc.second_channel_dropzone_threshold_px,
-                True,
             ):
                 has_object_in_2_1_dropzone = True
 
