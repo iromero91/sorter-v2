@@ -64,6 +64,7 @@ class BusMessageProcessor {
   public:
     BusMessageProcessor(uint8_t device_address, MasterCommandTable &command_tables, TXFunction send_response);
     void processIncomingData(char c);
+    void processQueuedMessage();
     void handleMessage(const BusMessage &msg, BusMessage &resp);
 
   private:

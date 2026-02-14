@@ -1,4 +1,27 @@
 
+/*
+ * Message structures and processing
+ * Copyright (C) 2026 Jose I Romero
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include "message.h"
 #include "cobs.h"
 #include "crc.h"
@@ -110,7 +133,20 @@ void BusMessageProcessor::processIncomingData(char c) {
         _rx_buffer_pos = 0;
         return;
     }
+}
 
+
+/** \brief Process queued messages, if any.
+ *
+ * This function should be called regularly in the main loop to check if a
+ * complete message has been received and is ready to be processed. If _msg_len
+ * is greater than 0, it means we have a complete message in _rx_message that
+ * can be processed. This function will call handleMessage to process the
+ * command and prepare a response, then COBS encode the response and send it
+ * using the transmit function. Finally, it sets _msg_len to -1 to indicate
+ * that the current message has been processed and the buffer can be reused.
+ */
+void BusMessageProcessor::processQueuedMessage() {
     // If we have a complete message, process it
     if (_msg_len > 0) {
         // Process message, prepare response in place in _tx_message
@@ -130,6 +166,6 @@ void BusMessageProcessor::processIncomingData(char c) {
             return;
         }
         _transmit_function(_tx_buffer, enc_len);
-        _msg_len = 0; // Message, processed, drop it
+        _msg_len = -1; // Message, processed, drop it
     }
 }

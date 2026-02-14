@@ -34,8 +34,6 @@ def COBS_decode(buff: bytearray) -> bytearray:
 
 import logging
 
-from sympy import true
-
 logging.basicConfig(level=logging.WARNING)
 
 import serial
@@ -48,8 +46,8 @@ DBG_MESSAGE_COUNT = 0
 
 class CommandCodes:
     # Common Commands
-    CMD_INIT = 0x01
-    CMD_PING = 0x02
+    CMD_INIT = 0x00
+    CMD_PING = 0x01
     # Stepper Commands
     CMD_STEPPER_MOVE_STEPS = 0x10
     CMD_STEPPER_MOVE_AT_SPEED = 0x11
@@ -165,7 +163,7 @@ if __name__ == "__main__":
     start_time = time.monotonic()
     message_count = DBG_MESSAGE_COUNT
     try:
-        while true:
+        while True:
             for i in range(4):
                 if card.stepper_is_stopped(channel=i):
                     card.stepper_set_speed_limits(channel=i, min_speed=16, max_speed=random.randint(500, 2500))
@@ -178,4 +176,5 @@ if __name__ == "__main__":
                     message_count = DBG_MESSAGE_COUNT
                     start_time = now
     except DecodeError as e:
+        raise
         print(f"Error: {e}")

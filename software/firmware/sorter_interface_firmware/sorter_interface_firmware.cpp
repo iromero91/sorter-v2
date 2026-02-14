@@ -59,7 +59,7 @@ const struct CommandTable baseCmdTable = { //
     .prefix = NULL,
     .commands = {{
         {"INIT", "", "", 0, NULL, CMDH_init},
-        {"PING", "", "", 0, NULL, CMDH_ping},
+        {"PING", "", "", 255, NULL, CMDH_ping},
     }}};
 
 const struct CommandTable stepperCmdTable = {
@@ -231,14 +231,16 @@ void CMDH_ping(const BusMessage *msg, BusMessage *resp) {
 bool VAL_stepper_channel(uint8_t channel) { return channel < STEPPER_COUNT; }
 
 void CMDH_stepper_move_steps(const BusMessage *msg, BusMessage *resp) {
-    int32_t distance = *(int32_t *)msg->payload;
+    int32_t distance;
+    memcpy(&distance, msg->payload, sizeof(distance));
     bool result = steppers[msg->channel].moveSteps(distance);
     resp->payload[0] = result ? 1 : 0;
     resp->payload_length = 1;
 }
 
 void CMDH_stepper_move_at_speed(const BusMessage *msg, BusMessage *resp) {
-    int32_t speed = *(int32_t *)msg->payload;
+    int32_t speed;
+    memcpy(&speed, msg->payload, sizeof(speed));
     bool result = steppers[msg->channel].moveAtSpeed(speed);
     resp->payload[0] = result ? 1 : 0;
     resp->payload_length = 1;
@@ -263,14 +265,16 @@ void CMDH_digital_write(const BusMessage *msg, BusMessage *resp) {
 }
 
 void CMDH_stepper_set_speed_limits(const BusMessage *msg, BusMessage *resp) {
-    uint32_t min_speed = ((uint32_t *)msg->payload)[0];
-    uint32_t max_speed = ((uint32_t *)msg->payload)[1];
+    uint32_t min_speed, max_speed;
+    memcpy(&min_speed, msg->payload, sizeof(min_speed));
+    memcpy(&max_speed, msg->payload + sizeof(min_speed), sizeof(max_speed));
     steppers[msg->channel].setSpeedLimits(min_speed, max_speed);
     resp->payload_length = 0;
 }
 
 void CMDH_stepper_set_acceleration(const BusMessage *msg, BusMessage *resp) {
-    uint32_t acceleration = ((uint32_t *)msg->payload)[0];
+    uint32_t acceleration;
+    memcpy(&acceleration, msg->payload, sizeof(acceleration));
     steppers[msg->channel].setAcceleration(acceleration);
     resp->payload_length = 0;
 }
@@ -283,18 +287,20 @@ void CMDH_stepper_is_stopped(const BusMessage *msg, BusMessage *resp) {
 
 void CMDH_stepper_get_position(const BusMessage *msg, BusMessage *resp) {
     int32_t position = steppers[msg->channel].getPosition();
-    ((int32_t *)resp->payload)[0] = position;
-    resp->payload_length = 4;
+    memcpy(resp->payload, &position, sizeof(position));
+    resp->payload_length = sizeof(position);
 }
 
 void CMDH_stepper_set_position(const BusMessage *msg, BusMessage *resp) {
-    int32_t position = ((int32_t *)msg->payload)[0];
+    int32_t position;
+    memcpy(&position, msg->payload, sizeof(position));
     steppers[msg->channel].setPosition(position);
     resp->payload_length = 0;
 }
 
 void CMDH_stepper_home(const BusMessage *msg, BusMessage *resp) {
-    int32_t home_speed = ((int32_t *)msg->payload)[0];
+    int32_t home_speed;
+    memcpy(&home_speed, msg->payload, sizeof(home_speed));
     uint8_t home_pin = msg->payload[4];
     bool home_pin_polarity = msg->payload[5] != 0;
     steppers[msg->channel].home(home_speed, home_pin, home_pin_polarity);
@@ -366,13 +372,14 @@ void CMDH_stepper_drv_read_register(const BusMessage *msg, BusMessage *resp) {
         resp->payload_length = snprintf((char *)resp->payload, 246, "Failed to read register %d", reg);
         return;
     }
-    ((uint32_t *)resp->payload)[0] = value;
-    resp->payload_length = 4;
+    memcpy(resp->payload, &value, sizeof(value));
+    resp->payload_length = sizeof(value);
 }
 
 void CMDH_stepper_drv_write_register(const BusMessage *msg, BusMessage *resp) {
     uint8_t reg = msg->payload[0];
-    uint32_t value = ((uint32_t *)msg->payload)[1];
+    uint32_t value;
+    memcpy(&value, msg->payload + 1, sizeof(value));
     tmc_drivers[msg->channel].writeRegister(reg, value);
     resp->payload_length = 0;
 }
@@ -438,6 +445,7 @@ int main() {
             if (c == PICO_ERROR_TIMEOUT)
                 break; // No more characters to read
             msg_processor.processIncomingData((char)c);
+            msg_processor.processQueuedMessage();
         }
     }
 }
