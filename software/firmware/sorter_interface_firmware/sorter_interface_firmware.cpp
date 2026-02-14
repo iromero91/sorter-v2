@@ -93,8 +93,8 @@ const struct CommandTable stepperDrvCmdTable = {
 const struct CommandTable digitalIoCmdTable = { //
     .prefix = "DIGITAL_IO",
     .commands = {{
-        {"READ", "B", "B", 1, VAL_digital_in_channel, CMDH_digital_read},
-        {"WRITE", "BB", "", 2, VAL_digital_out_channel, CMDH_digital_write},
+        {"READ", "", "?", 0, VAL_digital_in_channel, CMDH_digital_read},
+        {"WRITE", "?", "", 1, VAL_digital_out_channel, CMDH_digital_write},
     }}};
 
 const MasterCommandTable command_tables = {{&baseCmdTable, &stepperCmdTable, &stepperDrvCmdTable, &digitalIoCmdTable}};
