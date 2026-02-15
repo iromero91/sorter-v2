@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "PCA9685.h"
+#include "Servo.h"
 #include "Stepper.h"
 #include "TMC2209.h"
 #include "TMC_UART.h"
@@ -36,6 +38,14 @@
 
 void CMDH_init(const BusMessage *msg, BusMessage *resp);
 void CMDH_ping(const BusMessage *msg, BusMessage *resp);
+
+const struct CommandTable baseCmdTable = { //
+    .prefix = NULL,
+    .commands = {{
+        {"INIT", "", "s", 0, NULL, CMDH_init},
+        {"PING", "", "", 255, NULL, CMDH_ping},
+    }}};
+
 void CMDH_stepper_move_steps(const BusMessage *msg, BusMessage *resp);
 void CMDH_stepper_move_at_speed(const BusMessage *msg, BusMessage *resp);
 void CMDH_stepper_set_speed_limits(const BusMessage *msg, BusMessage *resp);
@@ -49,18 +59,7 @@ void CMDH_stepper_drv_set_microsteps(const BusMessage *msg, BusMessage *resp);
 void CMDH_stepper_drv_set_current(const BusMessage *msg, BusMessage *resp);
 void CMDH_stepper_drv_read_register(const BusMessage *msg, BusMessage *resp);
 void CMDH_stepper_drv_write_register(const BusMessage *msg, BusMessage *resp);
-void CMDH_digital_read(const BusMessage *msg, BusMessage *resp);
-void CMDH_digital_write(const BusMessage *msg, BusMessage *resp);
 bool VAL_stepper_channel(uint8_t channel);
-bool VAL_digital_out_channel(uint8_t channel);
-bool VAL_digital_in_channel(uint8_t channel);
-
-const struct CommandTable baseCmdTable = { //
-    .prefix = NULL,
-    .commands = {{
-        {"INIT", "", "s", 0, NULL, CMDH_init},
-        {"PING", "", "", 255, NULL, CMDH_ping},
-    }}};
 
 const struct CommandTable stepperCmdTable = {
     .prefix = "STEPPER",
@@ -90,6 +89,11 @@ const struct CommandTable stepperDrvCmdTable = {
         {"WRITE_REGISTER", "BI", "", 5, VAL_stepper_channel, CMDH_stepper_drv_write_register},
     }}};
 
+void CMDH_digital_read(const BusMessage *msg, BusMessage *resp);
+void CMDH_digital_write(const BusMessage *msg, BusMessage *resp);
+bool VAL_digital_out_channel(uint8_t channel);
+bool VAL_digital_in_channel(uint8_t channel);
+
 const struct CommandTable digitalIoCmdTable = { //
     .prefix = "DIGITAL_IO",
     .commands = {{
@@ -97,7 +101,31 @@ const struct CommandTable digitalIoCmdTable = { //
         {"WRITE", "?", "", 1, VAL_digital_out_channel, CMDH_digital_write},
     }}};
 
-const MasterCommandTable command_tables = {{&baseCmdTable, &stepperCmdTable, &stepperDrvCmdTable, &digitalIoCmdTable}};
+void CMDH_servo_move_to(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_set_speed_limits(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_set_acceleration(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_get_position(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_is_stopped(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_stop(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_set_enabled(const BusMessage *msg, BusMessage *resp);
+void CMDH_servo_set_duty_limits(const BusMessage *msg, BusMessage *resp);
+bool VAL_servo_channel(uint8_t channel);
+
+const struct CommandTable servoCmdTable = {
+    .prefix = "SERVO",
+    .commands = {{
+        {"MOVE_TO", "I", "?", 4, VAL_servo_channel, CMDH_servo_move_to},
+        {"SET_SPEED_LIMITS", "II", "", 8, VAL_servo_channel, CMDH_servo_set_speed_limits},
+        {"SET_ACCELERATION", "I", "", 4, VAL_servo_channel, CMDH_servo_set_acceleration},
+        {"GET_POSITION", "", "I", 0, VAL_servo_channel, CMDH_servo_get_position},
+        {"IS_STOPPED", "", "?", 0, VAL_servo_channel, CMDH_servo_is_stopped},
+        {"STOP", "", "", 0, VAL_servo_channel, CMDH_servo_stop},
+        {"SET_ENABLED", "?", "", 1, VAL_servo_channel, CMDH_servo_set_enabled},
+        {"SET_DUTY_LIMITS", "II", "", 8, VAL_servo_channel, CMDH_servo_set_duty_limits},
+    }}};
+
+const MasterCommandTable command_tables = {
+    {&baseCmdTable, &stepperCmdTable, &stepperDrvCmdTable, &digitalIoCmdTable, &servoCmdTable}};
 
 // #define MAIN_TRACE_ENABLED
 
@@ -153,7 +181,14 @@ const int digital_output_pins[] = {14, 15};
 const int I2C_SDA_PIN = 10;
 const int I2C_SCL_PIN = 11;
 
-const uint8_t SERVO_COUNT = 0;
+const uint8_t SERVO_I2C_ADDRESS = 0x40; // Address of the PCA9685 controlling the servos
+uint8_t SERVO_COUNT = 0; // Number of servos controlled by the PCA9685, should be <= 16
+
+PCA9685 servo_controller(SERVO_I2C_ADDRESS, i2c0);
+std::array<Servo, 16> servos = {
+    Servo(), Servo(), Servo(), Servo(), Servo(), Servo(), Servo(), Servo(),
+    Servo(), Servo(), Servo(), Servo(), Servo(), Servo(), Servo(), Servo()
+};
 
 // clang-format on
 // End board configuration
@@ -214,6 +249,23 @@ void initialize_hardware() {
         gpio_init(digital_output_pins[i]);
         gpio_set_dir(digital_output_pins[i], GPIO_OUT);
         gpio_put(digital_output_pins[i], 0);
+    }
+    // Initialize i2c
+    i2c_init(i2c0, 400000);
+    gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(I2C_SDA_PIN);
+    gpio_pull_up(I2C_SCL_PIN);
+    // Initialize servo controller and servos
+    bool sc_present = servo_controller.initialize();
+    if (sc_present) {
+        SERVO_COUNT = 16;
+        for (int i = 0; i < SERVO_COUNT; i++) {
+            servos[i].setEnabled(false);
+            servo_controller.setPWM(i, 0); // Set all servos to 0 duty cycle (should be safe for all servos)
+        }
+    } else {
+        SERVO_COUNT = 0;
     }
 }
 
@@ -384,6 +436,62 @@ void CMDH_stepper_drv_write_register(const BusMessage *msg, BusMessage *resp) {
     resp->payload_length = 0;
 }
 
+void CMDH_servo_move_to(const BusMessage *msg, BusMessage *resp) {
+    uint16_t position;
+    memcpy(&position, msg->payload, sizeof(position));
+    bool result = servos[msg->channel].moveTo(position);
+    resp->payload[0] = result ? 1 : 0;
+    resp->payload_length = 1;
+}
+
+void CMDH_servo_set_speed_limits(const BusMessage *msg, BusMessage *resp) {
+    uint16_t min_speed, max_speed;
+    memcpy(&min_speed, msg->payload, sizeof(min_speed));
+    memcpy(&max_speed, msg->payload + sizeof(min_speed), sizeof(max_speed));
+    servos[msg->channel].setSpeedLimits(min_speed, max_speed);
+    resp->payload_length = 0;
+}
+
+void CMDH_servo_set_acceleration(const BusMessage *msg, BusMessage *resp) {
+    uint32_t acceleration;
+    memcpy(&acceleration, msg->payload, sizeof(acceleration));
+    servos[msg->channel].setAcceleration(acceleration);
+    resp->payload_length = 0;
+}
+
+void CMDH_servo_get_position(const BusMessage *msg, BusMessage *resp) {
+    uint16_t position = servos[msg->channel].getCurrentPosition();
+    memcpy(resp->payload, &position, sizeof(position));
+    resp->payload_length = sizeof(position);
+}
+
+void CMDH_servo_is_stopped(const BusMessage *msg, BusMessage *resp) {
+    bool is_stopped = servos[msg->channel].isStopped();
+    resp->payload[0] = is_stopped ? 1 : 0;
+    resp->payload_length = 1;
+}
+
+void CMDH_servo_stop(const BusMessage *msg, BusMessage *resp) {
+    servos[msg->channel].stopMotion();
+    resp->payload_length = 0;
+}
+
+void CMDH_servo_set_enabled(const BusMessage *msg, BusMessage *resp) {
+    bool enabled = msg->payload[0] != 0;
+    servos[msg->channel].setEnabled(enabled);
+    resp->payload_length = 0;
+}
+
+void CMDH_servo_set_duty_limits(const BusMessage *msg, BusMessage *resp) {
+    uint16_t min_duty, max_duty;
+    memcpy(&min_duty, msg->payload, sizeof(min_duty));
+    memcpy(&max_duty, msg->payload + sizeof(min_duty), sizeof(max_duty));
+    servos[msg->channel].setDutyCycleLimits(min_duty, max_duty);
+    resp->payload_length = 0;
+}
+
+bool VAL_servo_channel(uint8_t channel) { return channel < SERVO_COUNT; }
+
 const uint32_t STEP_TICK_PERIOD_US = 1000000 / STEP_TICK_RATE_HZ;
 const uint32_t MOTION_UPDATE_PERIOD_US = 1000000 / STEP_MOTION_UPDATE_RATE_HZ;
 
@@ -409,6 +517,8 @@ void core1_motion_update_isr(uint alarm_num) {
     TRACE_LOW();
 }
 
+const int SERVO_UPDATE_PERIOD_US = 1000000 / SERVO_UPDATE_RATE_HZ;
+
 void core1_entry() {
     // Core 1 main loop, this deals with high speed real-time tasks like stepper control.
     TRACE_INIT();
@@ -421,9 +531,18 @@ void core1_entry() {
     hardware_alarm_set_target(1, time_us_64() + MOTION_UPDATE_PERIOD_US);
     hardware_alarm_set_callback(1, core1_motion_update_isr);
 
+    uint32_t last_servo_update_time = time_us_32();
+
     while (true) {
-        // Core 1 main loop does nothing, all work is done in interrupts
-        tight_loop_contents();
+        // Update servos in our free time
+        uint32_t now = time_us_32();
+        if (now - last_servo_update_time >= SERVO_UPDATE_PERIOD_US) {
+            for (int i = 0; i < SERVO_COUNT; i++) {
+                servos[i].update();
+                servo_controller.setPWM(i, servos[i].getCurrentDuty());
+            }
+            last_servo_update_time = now;
+        }
     }
 }
 
@@ -436,7 +555,6 @@ int main() {
     BusMessageProcessor msg_processor(DEVICE_ADDRESS, command_tables, [](const char *data, int length) {
         stdio_put_string(data, length, false, false);
     });
-
     // Main loop, this deals with communications and high level command processing
     while (true) {
         // Read characters from USB if available and feed to the message processor

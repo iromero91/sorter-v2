@@ -29,37 +29,37 @@
 
 PCA9685::PCA9685(uint8_t i2c_addr, i2c_inst_t *i2c_port) : _i2c_addr(i2c_addr), _i2c_port(i2c_port) {
     _channel_duty.fill(0);
-    if (!detectI2C()) {
-        // Device not detected, don't attempt to initialize
-        return;
-    }
-    // Initialize the PCA9685
+}
+
+/** \brief Detect if the PCA9685 is present on the I2C bus and initialize it
+ *
+ * This function attempts to write to the MODE1 and MODE2 registers of the PCA9685 to configure it for normal operation.
+ * If the device is present and responds to the I2C commands, it will be configured to respond to ALL CALL addresses and
+ * use a totem pole structure for the outputs. If any of the I2C operations fail (e.g. due to no response from the
+ * device), the function will return false, indicating that the device was not detected.
+ *
+ * \return true if the device is detected and initialized successfully, false otherwise
+ */
+bool PCA9685::initialize() {
     uint8_t mode1 = PCA_MODE1_ALLCALL; // Respond to I2C ALL CALL
     mode1 |= PCA_MODE1_AI;             // Enable auto-increment
-    int res =
+    int res;
+    res =
         i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE1, mode1}, 2, false, PCA9685_I2C_TIMEOUT_US);
     if (res < 0)
-        return;                       // Optionally handle error
+        return false;
     uint8_t mode2 = PCA_MODE2_OUTDRV; // Totem pole structure
     res =
         i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE2, mode2}, 2, false, PCA9685_I2C_TIMEOUT_US);
     if (res < 0)
-        return; // Optionally handle error
-}
-
-/** \brief Detect if the PCA9685 is present on the I2C bus
- *
- * This function attempts to read from the MODE1 register of the PCA9685. If the device is present and responsive, it
- * should return a valid value. If there is no response or an error occurs, it returns false.
- *
- * \return true if the device is detected, false otherwise
- */
-bool PCA9685::detectI2C() {
-    uint8_t dummy;
-    i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE1}, 1, true,
-                         PCA9685_I2C_TIMEOUT_US); // Write register address
-    int res = i2c_read_timeout_us(_i2c_port, _i2c_addr, &dummy, 1, false, PCA9685_I2C_TIMEOUT_US);
-    return res >= 0; // If we got a response, the device is present
+        return false;
+    // initialize all channels to 0 duty cycle (off)
+    uint8_t all_led_off_data[5] = {PCA_REG_ALL_LED_OFF_L, 0, 0, 0, 0}; // off_l=0, off_h=0 means fully off
+    res = i2c_write_timeout_us(_i2c_port, _i2c_addr, all_led_off_data, 5, false, PCA9685_I2C_TIMEOUT_US);
+    if (res < 0)
+        return false;
+    _channel_duty.fill(0); // Update internal state to match hardware
+    return true; // If we got a response, the device is present
 }
 
 /** \brief Set the PWM frequency for all channels

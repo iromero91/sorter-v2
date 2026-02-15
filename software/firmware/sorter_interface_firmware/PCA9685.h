@@ -68,9 +68,9 @@ enum PCA9685Mode2Bits {
 class PCA9685 {
   public:
     PCA9685(uint8_t i2c_addr, i2c_inst_t *i2c_port);
+    bool initialize();
     void setPWMFreq(uint16_t freq);
     void setPWM(uint8_t channel, uint16_t duty);
-    bool detectI2C();
 
   private:
     uint8_t _i2c_addr;

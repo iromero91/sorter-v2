@@ -42,7 +42,7 @@ public:
     void setSpeedLimits(uint16_t min_speed, uint16_t max_speed) { _min_speed = min_speed; _max_speed = max_speed; }
     void setDutyCycleLimits(uint16_t min_duty, uint16_t max_duty) { _min_duty = min_duty; _max_duty = max_duty; }
     void setAcceleration(uint16_t acceleration) { _acceleration = acceleration; }
-    bool isMoving() const { return _state != SERVO_IDLE; }
+    bool isStopped() const { return _state == SERVO_IDLE || _state == SERVO_DISABLED; }
     void stopMotion();
     void setEnabled(bool enabled);
     void update();
