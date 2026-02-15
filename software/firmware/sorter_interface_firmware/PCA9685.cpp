@@ -29,6 +29,10 @@
 
 PCA9685::PCA9685(uint8_t i2c_addr, i2c_inst_t *i2c_port) : _i2c_addr(i2c_addr), _i2c_port(i2c_port) {
     _channel_duty.fill(0);
+    if (!detectI2C()) {
+        // Device not detected, don't attempt to initialize
+        return;
+    }
     // Initialize the PCA9685
     uint8_t mode1 = PCA_MODE1_ALLCALL; // Respond to I2C ALL CALL
     mode1 |= PCA_MODE1_AI;             // Enable auto-increment
@@ -41,6 +45,21 @@ PCA9685::PCA9685(uint8_t i2c_addr, i2c_inst_t *i2c_port) : _i2c_addr(i2c_addr), 
         i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE2, mode2}, 2, false, PCA9685_I2C_TIMEOUT_US);
     if (res < 0)
         return; // Optionally handle error
+}
+
+/** \brief Detect if the PCA9685 is present on the I2C bus
+ *
+ * This function attempts to read from the MODE1 register of the PCA9685. If the device is present and responsive, it
+ * should return a valid value. If there is no response or an error occurs, it returns false.
+ *
+ * \return true if the device is detected, false otherwise
+ */
+bool PCA9685::detectI2C() {
+    uint8_t dummy;
+    i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE1}, 1, true,
+                         PCA9685_I2C_TIMEOUT_US); // Write register address
+    int res = i2c_read_timeout_us(_i2c_port, _i2c_addr, &dummy, 1, false, PCA9685_I2C_TIMEOUT_US);
+    return res >= 0; // If we got a response, the device is present
 }
 
 /** \brief Set the PWM frequency for all channels
@@ -67,9 +86,14 @@ void PCA9685::setPWMFreq(uint16_t freq) {
 
     // Put the device to sleep to set the prescaler
     uint8_t oldmode;
-    int res = i2c_read_timeout_us(_i2c_port, _i2c_addr, &oldmode, 1, false, PCA9685_I2C_TIMEOUT_US);
+
+    int res = i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE1}, 1, true,
+                                   PCA9685_I2C_TIMEOUT_US); // Write register address
     if (res < 0)
-        return;                                           // Optionally handle error
+        return;
+    res = i2c_read_timeout_us(_i2c_port, _i2c_addr, &oldmode, 1, false, PCA9685_I2C_TIMEOUT_US);
+    if (res < 0)
+        return;
     uint8_t newmode = (oldmode & 0x7F) | PCA_MODE1_SLEEP; // Sleep
     res = i2c_write_timeout_us(_i2c_port, _i2c_addr, (uint8_t[]){PCA_REG_MODE1, newmode}, 2, false,
                                PCA9685_I2C_TIMEOUT_US);
