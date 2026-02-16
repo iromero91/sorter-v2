@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from global_config import GlobalConfig
-from .bin_layout import DistributionLayout
+from irl.bin_layout import DistributionLayout
 
 if TYPE_CHECKING:
     from irl.stepper import Stepper

@@ -5,7 +5,7 @@ from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
 from .states import DistributionState
 from .chute import Chute, BinAddress
-from .bin_layout import DistributionLayout, Bin, extractCategories
+from irl.bin_layout import DistributionLayout, Bin, extractCategories
 from irl.config import IRLInterface
 from global_config import GlobalConfig
 from sorting_profile import SortingProfile, MISC_CATEGORY

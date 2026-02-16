@@ -6,7 +6,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 import sys
 import readchar
 from global_config import mkGlobalConfig
-from irl.config import mkIRLConfig, mkIRLInterface
+from irl.config import mkIRLConfig, mkIRLInterface, SERVO_OPEN_ANGLE, SERVO_CLOSED_ANGLE
 from blob_manager import setStepperPosition
 
 STEP_COUNTS = [1, 10, 50, 100, 200, 500, 750, 1000, 1500, 2000]
@@ -45,12 +45,12 @@ def main():
         print("  Tab     Switch stepper")
         print("  Enter   Set current position as zero")
         print()
-        print("Servo Controls:")
-        for i in range(4):
+        print("Servo Controls (per layer):")
+        for i, layer in enumerate(irl.distribution_layout.layers):
             angle = irl.servo_angles[i]
-            state = "open" if angle == irl_config.servo_open_angle else "closed"
+            state = "open" if angle == SERVO_OPEN_ANGLE else "closed"
             print(
-                f"  {i + 1}       Toggle servo_{i + 1} (currently {state} at {angle}°)"
+                f"  {i + 1}       Toggle layer {i} servo (pin {layer.servo_pin}, currently {state} at {angle}°)"
             )
         print()
         print("  Q       Quit")
@@ -93,16 +93,16 @@ def main():
             printStatus()
             print(f"Zeroed {name} position")
         elif key in "1234":
-            servo_idx = int(key) - 1
-            if servo_idx < 4:
-                pin = irl_config.servo_pins[servo_idx]
-                current_angle = irl.servo_angles[servo_idx]
-                if current_angle == irl_config.servo_open_angle:
-                    new_angle = irl_config.servo_closed_angle
+            layer_idx = int(key) - 1
+            if layer_idx < len(irl.distribution_layout.layers):
+                layer = irl.distribution_layout.layers[layer_idx]
+                current_angle = irl.servo_angles[layer_idx]
+                if current_angle == SERVO_OPEN_ANGLE:
+                    new_angle = SERVO_CLOSED_ANGLE
                 else:
-                    new_angle = irl_config.servo_open_angle
-                irl.mcu.command("S", pin, new_angle)
-                irl.servo_angles[servo_idx] = new_angle
+                    new_angle = SERVO_OPEN_ANGLE
+                irl.mcu.command("S", layer.servo_pin, new_angle)
+                irl.servo_angles[layer_idx] = new_angle
                 printStatus()
         elif key.lower() == "q":
             print("Exiting...")

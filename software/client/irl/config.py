@@ -5,6 +5,23 @@ from global_config import GlobalConfig
 from .mcu import MCU
 from .stepper import Stepper
 from .device_discovery import discoverMCU
+from typing import TYPE_CHECKING
+
+SERVO_OPEN_ANGLE = 0
+SERVO_CLOSED_ANGLE = 72
+
+if TYPE_CHECKING:
+    from subsystems.distribution.chute import Chute
+
+from .bin_layout import (
+    getBinLayout,
+    BinLayoutConfig,
+    DistributionLayout,
+    mkLayoutFromConfig,
+    layoutMatchesCategories,
+    applyCategories,
+)
+from blob_manager import getBinCategories
 
 
 class CameraConfig:
@@ -36,12 +53,10 @@ class IRLConfig:
     first_c_channel_rotor_stepper: StepperConfig
     second_c_channel_rotor_stepper: StepperConfig
     third_c_channel_rotor_stepper: StepperConfig
-    servo_pins: list[int]
-    servo_open_angle: int
-    servo_closed_angle: int
     first_c_channel_aruco_tag_id: int
     second_c_channel_aruco_tag_id: int
     third_c_channel_aruco_tag_id: int
+    bin_layout_config: BinLayoutConfig
 
     def __init__(self):
         pass
@@ -55,6 +70,8 @@ class IRLInterface:
     second_c_channel_rotor_stepper: Stepper
     third_c_channel_rotor_stepper: Stepper
     servo_angles: list[int]
+    chute: "Chute"
+    distribution_layout: DistributionLayout
 
     def __init__(self):
         pass
@@ -114,12 +131,10 @@ def mkIRLConfig() -> IRLConfig:
     irl_config.third_c_channel_rotor_stepper = mkStepperConfig(
         step_pin=54, dir_pin=55, enable_pin=38
     )
-    irl_config.servo_pins = [4, 5, 6, 11]
-    irl_config.servo_open_angle = 0
-    irl_config.servo_closed_angle = 72
     irl_config.first_c_channel_aruco_tag_id = 86
     irl_config.second_c_channel_aruco_tag_id = 815
     irl_config.third_c_channel_aruco_tag_id = 957
+    irl_config.bin_layout_config = getBinLayout()
     return irl_config
 
 
@@ -187,6 +202,23 @@ def mkIRLInterface(config: IRLConfig, gc: GlobalConfig) -> IRLInterface:
     )
     time.sleep(1)
 
-    irl_interface.servo_angles = [config.servo_open_angle] * 4
+    irl_interface.distribution_layout = mkLayoutFromConfig(config.bin_layout_config)
+
+    num_layers = len(irl_interface.distribution_layout.layers)
+    irl_interface.servo_angles = [SERVO_OPEN_ANGLE] * num_layers
+
+    saved_categories = getBinCategories()
+    if saved_categories is not None:
+        if layoutMatchesCategories(irl_interface.distribution_layout, saved_categories):
+            applyCategories(irl_interface.distribution_layout, saved_categories)
+            gc.logger.info("Loaded bin categories from storage")
+        else:
+            gc.logger.warn("Saved bin categories don't match layout, ignoring")
+
+    from subsystems.distribution.chute import Chute
+
+    irl_interface.chute = Chute(
+        gc, irl_interface.chute_stepper, irl_interface.distribution_layout
+    )
 
     return irl_interface

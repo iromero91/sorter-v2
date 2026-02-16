@@ -7,8 +7,7 @@ import sys
 import readchar
 from global_config import mkGlobalConfig
 from irl.config import mkIRLConfig, mkIRLInterface
-from subsystems.distribution.bin_layout import mkDefaultLayout
-from subsystems.distribution.chute import Chute, BinAddress
+from subsystems.distribution.chute import BinAddress
 from blob_manager import setStepperPosition
 
 STEP_COUNTS = [
@@ -36,8 +35,8 @@ def main():
     gc = mkGlobalConfig()
     irl_config = mkIRLConfig()
     irl = mkIRLInterface(irl_config, gc)
-    layout = mkDefaultLayout()
-    chute = Chute(gc, irl.chute_stepper, layout)
+    layout = irl.distribution_layout
+    chute = irl.chute
     stepper = irl.chute_stepper
 
     layer_idx = 0
