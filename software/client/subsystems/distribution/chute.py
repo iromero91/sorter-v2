@@ -6,7 +6,7 @@ from irl.bin_layout import DistributionLayout
 if TYPE_CHECKING:
     from irl.stepper import Stepper
 
-GEAR_RATIO = 5
+GEAR_RATIO = 4
 SECTIONS_PER_LAYER = 6
 DEG_PER_SECTION = 60
 PILLAR_WIDTH_DEG = 2.5
