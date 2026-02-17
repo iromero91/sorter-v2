@@ -146,7 +146,9 @@ class VisionManager:
 
         if ids is not None:
             annotated = annotated.copy()
-            aruco.drawDetectedMarkers(annotated, corners, ids, borderColor=(0, 255, 255))
+            aruco.drawDetectedMarkers(
+                annotated, corners, ids, borderColor=(0, 255, 255)
+            )
 
             # draw tag IDs in aqua/teal
             for i, tag_id in enumerate(ids.flatten()):
@@ -352,11 +354,19 @@ class VisionManager:
         annotated = annotated.copy()
 
         # get tag positions for both channels (only radius tags needed)
-        third_r1_pos = aruco_tags.get(self._irl_config.aruco_tags.third_c_channel_radius1_id)
-        third_r2_pos = aruco_tags.get(self._irl_config.aruco_tags.third_c_channel_radius2_id)
+        third_r1_pos = aruco_tags.get(
+            self._irl_config.aruco_tags.third_c_channel_radius1_id
+        )
+        third_r2_pos = aruco_tags.get(
+            self._irl_config.aruco_tags.third_c_channel_radius2_id
+        )
 
-        second_r1_pos = aruco_tags.get(self._irl_config.aruco_tags.second_c_channel_radius1_id)
-        second_r2_pos = aruco_tags.get(self._irl_config.aruco_tags.second_c_channel_radius2_id)
+        second_r1_pos = aruco_tags.get(
+            self._irl_config.aruco_tags.second_c_channel_radius1_id
+        )
+        second_r2_pos = aruco_tags.get(
+            self._irl_config.aruco_tags.second_c_channel_radius2_id
+        )
 
         # draw channel 3 (inner) - circle from two radius tags
         if geometry.third_channel:
@@ -369,8 +379,13 @@ class VisionManager:
 
             # draw diameter line through the two radius tags
             if third_r1_pos and third_r2_pos:
-                cv2.line(annotated, (int(third_r1_pos[0]), int(third_r1_pos[1])),
-                        (int(third_r2_pos[0]), int(third_r2_pos[1])), (255, 0, 255), 2)
+                cv2.line(
+                    annotated,
+                    (int(third_r1_pos[0]), int(third_r1_pos[1])),
+                    (int(third_r2_pos[0]), int(third_r2_pos[1])),
+                    (255, 0, 255),
+                    2,
+                )
 
             # draw quadrant divider lines
             for q in range(4):
@@ -419,8 +434,13 @@ class VisionManager:
 
             # draw diameter line through the two radius tags
             if second_r1_pos and second_r2_pos:
-                cv2.line(annotated, (int(second_r1_pos[0]), int(second_r1_pos[1])),
-                        (int(second_r2_pos[0]), int(second_r2_pos[1])), (0, 255, 255), 2)
+                cv2.line(
+                    annotated,
+                    (int(second_r1_pos[0]), int(second_r1_pos[1])),
+                    (int(second_r2_pos[0]), int(second_r2_pos[1])),
+                    (0, 255, 255),
+                    2,
+                )
 
             # draw quadrant divider lines
             for q in range(4):

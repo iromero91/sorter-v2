@@ -120,14 +120,20 @@ class InferenceThread:
                                 continue
                             confidence = float(box.conf[0])
                             xyxy = list(map(int, box.xyxy[0].tolist()))
-                            class_name = binding.model.names.get(class_id, str(class_id))
+                            class_name = binding.model.names.get(
+                                class_id, str(class_id)
+                            )
 
                             # choose color based on class: carousel (2) = red, object (0) = green
                             color = (0, 0, 255) if class_id == 2 else (0, 255, 0)
 
                             # draw bounding box
                             cv2.rectangle(
-                                annotated, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), color, 2
+                                annotated,
+                                (xyxy[0], xyxy[1]),
+                                (xyxy[2], xyxy[3]),
+                                color,
+                                2,
                             )
                             # draw label
                             label = f"{class_name} {confidence:.2f}"
@@ -141,7 +147,9 @@ class InferenceThread:
                                 2,
                             )
                             # draw mask if available
-                            if results[0].masks is not None and i < len(results[0].masks):
+                            if results[0].masks is not None and i < len(
+                                results[0].masks
+                            ):
                                 mask_data = results[0].masks[i].data[0].cpu().numpy()
                                 mh, mw = mask_data.shape
                                 h, w = frame.raw.shape[:2]
@@ -154,7 +162,9 @@ class InferenceThread:
                                 mask_data = (mask_data > 0).astype(np.uint8)
                                 color_mask = np.zeros_like(annotated)
                                 color_mask[mask_data == 1] = color
-                                annotated = cv2.addWeighted(annotated, 1.0, color_mask, 0.4, 0)
+                                annotated = cv2.addWeighted(
+                                    annotated, 1.0, color_mask, 0.4, 0
+                                )
                     else:
                         annotated = results[0].plot()
 

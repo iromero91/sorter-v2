@@ -33,8 +33,6 @@ class ChannelGeometry:
     third_channel: Optional[CircularChannel]
 
 
-
-
 def computeChannelGeometry(
     aruco_tags: Dict[int, Tuple[float, float]],
     aruco_config: "ArucoTagConfig",
@@ -90,8 +88,6 @@ def computeChannelGeometry(
         )
 
     return geometry
-
-
 
 
 def isPointInCircle(
