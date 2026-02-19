@@ -233,9 +233,11 @@ void initialize_hardware() {
         tmc_drivers[i].enableStealthChop(true);
     }
     // Global enable for stepper drivers
-    gpio_init(STEPPER_nEN_PIN);
-    gpio_set_dir(STEPPER_nEN_PIN, GPIO_OUT);
-    gpio_put(STEPPER_nEN_PIN, 0); // Enable stepper drivers
+    for (int i = 0; i < STEPPER_COUNT; i++) {
+        gpio_init(STEPPER_nEN_PINS[i]);
+        gpio_set_dir(STEPPER_nEN_PINS[i], GPIO_OUT);
+        gpio_put(STEPPER_nEN_PINS[i], 0); // Enable stepper drivers
+    }
     // Initialize digital inputs
     for (int i = 0; i < DIGITAL_INPUT_COUNT; i++) {
         gpio_init(digital_input_pins[i]);

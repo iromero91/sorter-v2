@@ -7,7 +7,7 @@ const int TMC_UART_TX_PIN = 16;
 const int TMC_UART_RX_PIN = 17;
 const int TMC_UART_BAUDRATE = 400000;
 
-const int STEPPER_nEN_PIN = 0;
+const int STEPPER_nEN_PINS[] = {0, 0, 0, 0};
 
 const uint8_t DIGITAL_INPUT_COUNT = 4;
 const int digital_input_pins[] = {9, 8, 13, 12};
