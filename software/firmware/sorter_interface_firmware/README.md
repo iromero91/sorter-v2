@@ -28,6 +28,22 @@ It is recommended to open this project using Visual Studio Code with the RP2040 
     picotool load -f sorter_interface_firmware.uf2
     ```
 
+## Custom Build Options
+
+You can customize the firmware build using CMake options:
+
+- `HW_SKR_PICO`: Enable compilation for SKR Pico hardware (default: OFF)
+- `INIT_DEVICE_NAME`: Set the initial device name (default: "DefaultDevice")
+- `INIT_DEVICE_ADDRESS`: Set the initial device address (default: 0x42)
+
+To use these options, pass them as `-D` arguments to CMake. For example:
+
+```sh
+cmake -DHW_SKR_PICO=ON -DINIT_DEVICE_NAME="DISTRIBUTOR" -DINIT_DEVICE_ADDRESS=0x01 ..
+```
+
+This will enable SKR Pico hardware support, set the device name to "DISTRIBUTOR", and the device address to 0x01.
+
 ## Code Style
 - Follows LLVM style (see `.clang-format`).
 - 4-space indentation, 120-column limit.
