@@ -1,31 +1,28 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 import time
 import queue
 from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
 from .states import ClassificationState
 from .carousel import Carousel
-from irl.config import IRLInterface
+from hardware.sorter_hardware import SorterHardware
+from hardware.sorter_interface import StepperMotor
 from global_config import GlobalConfig
 from defs.events import KnownObjectEvent, KnownObjectData, KnownObjectStatus
 
-if TYPE_CHECKING:
-    from irl.stepper import Stepper
-
-ROTATE_DURATION_MS = 1000
 
 
 class Rotating(BaseState):
     def __init__(
         self,
-        irl: IRLInterface,
+        hardware: SorterHardware,
         gc: GlobalConfig,
         shared: SharedVariables,
         carousel: Carousel,
-        stepper: "Stepper",
+    stepper: StepperMotor,
         event_queue: queue.Queue,
     ):
-        super().__init__(irl, gc)
+        super().__init__(hardware, gc)
         self.shared = shared
         self.carousel = carousel
         self.stepper = stepper
@@ -59,11 +56,10 @@ class Rotating(BaseState):
         if self.start_time is None:
             self.start_time = time.time()
             self.logger.info("Rotating: starting rotation")
-            self.stepper.rotate(-90.0)
+            self.stepper.move_degrees(-90.0)
             self.command_sent = True
 
-        elapsed_ms = (time.time() - self.start_time) * 1000
-        if elapsed_ms < ROTATE_DURATION_MS:
+        if not self.stepper.stopped:
             return None
 
         self.logger.info("Rotating: rotation complete")

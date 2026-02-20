@@ -10,7 +10,8 @@ from server.api import (
 from sorter_controller import SorterController
 from message_queue.handler import handleServerToMainEvent
 from defs.events import HeartbeatEvent, HeartbeatData, MainThreadToServerCommand
-from irl.config import mkIRLConfig, mkIRLInterface
+import toml
+from hardware.sorter_hardware import SorterHardware
 from vision import VisionManager
 from subsystems.distribution.bin_layout import mkDefaultLayout
 from subsystems.distribution.chute import Chute
@@ -57,16 +58,17 @@ def main() -> None:
     rv = mkRuntimeVariables(gc)
     setRuntimeVariables(rv)
     setCommandQueue(server_to_main_queue)
-    irl_config = mkIRLConfig()
-    irl = mkIRLInterface(irl_config, gc)
+    # Load hardware config from TOML
+    hardware_config = toml.load("hardware/system_config.toml")
+    hardware = SorterHardware(hardware_config)
 
     layout = mkDefaultLayout()
-    chute = Chute(gc, irl.chute_stepper, layout)
+    chute = Chute(gc, hardware.steppers["chute"], layout)
     gc.logger.info("Homing chute to zero...")
     chute.home()
 
-    vision = VisionManager(irl_config, gc)
-    controller = SorterController(irl, irl_config, gc, vision, main_to_server_queue, rv)
+    vision = VisionManager(gc)  # Remove irl_config dependency if possible
+    controller = SorterController(hardware, gc, vision, main_to_server_queue, rv)
     setController(controller)
     gc.logger.info("client starting...")
 
@@ -88,7 +90,7 @@ def main() -> None:
         while True:
             try:
                 event = server_to_main_queue.get(block=False)
-                handleServerToMainEvent(gc, controller, irl, event)
+                handleServerToMainEvent(gc, controller, hardware, event)
             except queue.Empty:
                 pass
 
@@ -124,28 +126,9 @@ def main() -> None:
 
         vision.stop()
 
-        # Clear any pending motor commands
-        while not irl.mcu.command_queue.empty():
-            try:
-                irl.mcu.command_queue.get_nowait()
-                irl.mcu.command_queue.task_done()
-            except:
-                break
-        while not irl.second_mcu.command_queue.empty():
-            try:
-                irl.second_mcu.command_queue.get_nowait()
-                irl.second_mcu.command_queue.task_done()
-            except:
-                break
-
         # Send motor shutdown commands and wait for them to complete
         gc.logger.info("Stopping all motors...")
-        irl.shutdownMotors()
-        irl.mcu.flush()
-        irl.second_mcu.flush()
-
-        irl.mcu.close()
-        irl.second_mcu.close()
+        hardware.shutdown_all()
         gc.logger.info("Cleanup complete")
         sys.exit(0)
 

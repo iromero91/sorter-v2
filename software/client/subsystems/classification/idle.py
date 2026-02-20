@@ -3,19 +3,19 @@ from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
 from .states import ClassificationState
 from .carousel import Carousel
-from irl.config import IRLInterface
+from hardware.sorter_hardware import SorterHardware
 from global_config import GlobalConfig
 
 
 class Idle(BaseState):
     def __init__(
         self,
-        irl: IRLInterface,
+        hardware: SorterHardware,
         gc: GlobalConfig,
         shared: SharedVariables,
         carousel: Carousel,
     ):
-        super().__init__(irl, gc)
+        super().__init__(hardware, gc)
         self.shared = shared
         self.carousel = carousel
 

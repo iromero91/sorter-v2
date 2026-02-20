@@ -7,7 +7,7 @@ from subsystems import (
     layoutMatchesCategories,
     applyCategories,
 )
-from irl.config import IRLInterface, IRLConfig
+from hardware.sorter_hardware import SorterHardware
 from global_config import GlobalConfig
 from runtime_variables import RuntimeVariables
 from vision import VisionManager
@@ -19,15 +19,13 @@ import queue
 class Coordinator:
     def __init__(
         self,
-        irl: IRLInterface,
-        irl_config: IRLConfig,
+        hardware: SorterHardware,
         gc: GlobalConfig,
         vision: VisionManager,
         event_queue: queue.Queue,
         rv: RuntimeVariables,
     ):
-        self.irl = irl
-        self.irl_config = irl_config
+        self.hardware = hardware
         self.gc = gc
         self.logger = gc.logger
         self.vision = vision
@@ -45,7 +43,7 @@ class Coordinator:
                 self.logger.warn("Saved bin categories don't match layout, ignoring")
 
         self.distribution = DistributionStateMachine(
-            irl,
+            hardware,
             gc,
             self.shared,
             self.sorting_profile,
@@ -53,9 +51,9 @@ class Coordinator:
             event_queue,
         )
         self.classification = ClassificationStateMachine(
-            irl, gc, self.shared, vision, event_queue
+            hardware, gc, self.shared, vision, event_queue
         )
-        self.feeder = FeederStateMachine(irl, irl_config, gc, self.shared, vision)
+        self.feeder = FeederStateMachine(hardware, gc, self.shared, vision)
 
     def step(self) -> None:
         self.feeder.step()

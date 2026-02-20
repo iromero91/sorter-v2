@@ -3,7 +3,7 @@ from states.base_state import BaseState
 from subsystems.shared_variables import SharedVariables
 from .states import ClassificationState
 from .carousel import Carousel
-from irl.config import IRLInterface
+from hardware.sorter_hardware import SorterHardware
 from global_config import GlobalConfig
 from vision.utils import maskEdgeProximity
 from defs.consts import FEEDER_OBJECT_CLASS_ID, FEEDER_CAROUSEL_CLASS_ID
@@ -17,13 +17,13 @@ OBJECT_DETECTION_CONFIDENCE_THRESHOLD = 0.3
 class Detecting(BaseState):
     def __init__(
         self,
-        irl: IRLInterface,
+        hardware: SorterHardware,
         gc: GlobalConfig,
         shared: SharedVariables,
         carousel: Carousel,
         vision: "VisionManager",
     ):
-        super().__init__(irl, gc)
+        super().__init__(hardware, gc)
         self.shared = shared
         self.carousel = carousel
         self.vision = vision
