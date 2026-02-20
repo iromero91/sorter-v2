@@ -1,0 +1,15 @@
+# Example TOML configuration for SorterHardware
+
+[steppers]
+chute = ["DISTRIBUTOR", 0]
+carousel = ["FEEDER", 3]
+bulk_rotor = ["FEEDER", 0]
+rotor1 = ["FEEDER", 1]
+rotor2 = ["FEEDER", 2]
+
+[digital_inputs]
+chute_home = ["DISTRIBUTOR", 0]
+carousel_home = ["FEEDER", 3]
+
+[digital_outputs]
+feeder_lights = ["FEEDER", 0]

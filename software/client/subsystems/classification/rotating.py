@@ -1,0 +1,102 @@
+from typing import Optional
+import time
+import queue
+from states.base_state import BaseState
+from subsystems.shared_variables import SharedVariables
+from .states import ClassificationState
+from .carousel import Carousel
+from hardware.sorter_hardware import SorterHardware
+from hardware.sorter_interface import StepperMotor
+from global_config import GlobalConfig
+from defs.events import KnownObjectEvent, KnownObjectData, KnownObjectStatus
+
+
+
+class Rotating(BaseState):
+    def __init__(
+        self,
+        hardware: SorterHardware,
+        gc: GlobalConfig,
+        shared: SharedVariables,
+        carousel: Carousel,
+    stepper: StepperMotor,
+        event_queue: queue.Queue,
+    ):
+        super().__init__(hardware, gc)
+        self.shared = shared
+        self.carousel = carousel
+        self.stepper = stepper
+        self.event_queue = event_queue
+        self.start_time: Optional[float] = None
+        self.command_sent = False
+
+    def _emitObjectEvent(self, obj) -> None:
+        event = KnownObjectEvent(
+            tag="known_object",
+            data=KnownObjectData(
+                uuid=obj.uuid,
+                created_at=obj.created_at,
+                updated_at=obj.updated_at,
+                status=KnownObjectStatus(obj.status),
+                part_id=obj.part_id,
+                category_id=obj.category_id,
+                confidence=obj.confidence,
+                destination_bin=obj.destination_bin,
+                thumbnail=obj.thumbnail,
+                top_image=obj.top_image,
+                bottom_image=obj.bottom_image,
+            ),
+        )
+        self.event_queue.put(event)
+
+    def step(self) -> Optional[ClassificationState]:
+        if not self.shared.distribution_ready:
+            return None
+
+        if self.start_time is None:
+            self.start_time = time.time()
+            self.logger.info("Rotating: starting rotation")
+            self.stepper.move_degrees(-90.0)
+            self.command_sent = True
+
+        if not self.stepper.stopped:
+            return None
+
+        self.logger.info("Rotating: rotation complete")
+        exiting = self.carousel.rotate()
+        if exiting:
+            self.logger.info(f"Rotating: piece {exiting.uuid[:8]} exited carousel")
+
+        piece_at_exit = self.carousel.getPieceAtExit()
+        should_distribute = piece_at_exit and (
+            piece_at_exit.part_id is not None
+            or piece_at_exit.status in ("unknown", "not_found")
+        )
+        if should_distribute:
+            label = piece_at_exit.part_id or piece_at_exit.status
+            self.logger.info(
+                f"Rotating: piece {piece_at_exit.uuid[:8]} ({label}) now at exit, queueing for distribution"
+            )
+            piece_at_exit.status = "distributing"
+            piece_at_exit.updated_at = time.time()
+            self._emitObjectEvent(piece_at_exit)
+            self.shared.distribution_ready = False
+            self.shared.pending_piece = piece_at_exit
+        else:
+            self.shared.pending_piece = None
+
+        piece_at_class = self.carousel.getPieceAtClassification()
+        if piece_at_class is not None:
+            self.logger.info(
+                f"Rotating: piece {piece_at_class.uuid[:8]} at classification position"
+            )
+            return ClassificationState.SNAPPING
+        else:
+            self.logger.info("Rotating: no piece at classification, returning to idle")
+            self.shared.classification_ready = True
+            return ClassificationState.IDLE
+
+    def cleanup(self) -> None:
+        super().cleanup()
+        self.start_time = None
+        self.command_sent = False
