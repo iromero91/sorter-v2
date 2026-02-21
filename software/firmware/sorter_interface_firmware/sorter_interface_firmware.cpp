@@ -173,7 +173,7 @@ TMC_UART_Bus tmc_bus(TMC_UART);
 
 template <size_t... I>
 static std::array<TMC2209, STEPPER_COUNT> make_tmc_array(std::index_sequence<I...>) {
-    return {TMC2209(&tmc_bus, I)...};
+    return {TMC2209(&tmc_bus, TMC_UART_ADDRESSES[I])...};
 }
 
 static auto tmc_drivers = make_tmc_array(std::make_index_sequence<STEPPER_COUNT>{});
