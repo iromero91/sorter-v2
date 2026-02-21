@@ -224,9 +224,9 @@ class MCUDevice:
         """Send a command to this device and return the response."""
         return self._bus.send_command(self._address, command, channel, payload)
 
-    def ping(self, payload: bytes = b"") -> bool:
+    def ping(self, payload: bytes = b"") -> bytes:
         """Send a ping command to the device to check if it's responsive."""
-        return self.send_command(BaseCommandCode.PING, 0, payload)
+        return self.send_command(BaseCommandCode.PING, 0, payload).payload
     
     def detect(self) -> dict:
         """Send an init command to the device to check if it's responsive and properly initialized."""
