@@ -6,7 +6,7 @@ from .detecting import Detecting
 from .rotating import Rotating
 from .snapping import Snapping
 from .carousel import Carousel
-from irl.config import IRLInterface
+from hardware.sorter_hardware import SorterHardware
 from global_config import GlobalConfig
 from vision import VisionManager
 import queue
@@ -15,14 +15,14 @@ import queue
 class ClassificationStateMachine(BaseSubsystem):
     def __init__(
         self,
-        irl: IRLInterface,
+        hardware: SorterHardware,
         gc: GlobalConfig,
         shared: SharedVariables,
         vision: VisionManager,
         event_queue: queue.Queue,
     ):
         super().__init__()
-        self.irl = irl
+        self.hardware = hardware
         self.gc = gc
         self.logger = gc.logger
         self.shared = shared
@@ -31,16 +31,17 @@ class ClassificationStateMachine(BaseSubsystem):
         self.carousel = Carousel(gc.logger, event_queue)
         self.current_state = ClassificationState.IDLE
 
+        # Replace irl.carousel_stepper with hardware.steppers["carousel"]
         self.states_map = {
-            ClassificationState.IDLE: Idle(irl, gc, shared, self.carousel),
+            ClassificationState.IDLE: Idle(hardware, gc, shared, self.carousel),
             ClassificationState.DETECTING: Detecting(
-                irl, gc, shared, self.carousel, vision
+                hardware, gc, shared, self.carousel, vision
             ),
             ClassificationState.ROTATING: Rotating(
-                irl, gc, shared, self.carousel, irl.carousel_stepper, event_queue
+                hardware, gc, shared, self.carousel, hardware.steppers["carousel"], event_queue
             ),
             ClassificationState.SNAPPING: Snapping(
-                irl, gc, shared, self.carousel, vision, event_queue
+                hardware, gc, shared, self.carousel, vision, event_queue
             ),
         }
 
