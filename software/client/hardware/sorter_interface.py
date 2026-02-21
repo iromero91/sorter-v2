@@ -31,10 +31,14 @@ class InterfaceCommandCode(BaseCommandCode):
     DIGITAL_READ = 0x30
     DIGITAL_WRITE = 0x31
     # Servo commands
-    SERVO_SET_ENABLED = 0x40
-    SERVO_MOVE_TO = 0x41
-    SERVO_SET_SPEED_LIMITS = 0x42
-    SERVO_SET_ACCELERATION = 0x43
+    SERVO_MOVE_TO = 0x40
+    SERVO_SET_SPEED_LIMITS = 0x41
+    SERVO_SET_ACCELERATION = 0x42
+    SERVO_GET_POSITION = 0x43
+    SERVO_IS_STOPPED = 0x44
+    SERVO_STOP = 0x45
+    SERVO_SET_ENABLED = 0x46
+    SERVO_SET_DUTY_LIMITS = 0x47
 
 
 class DigitalInputPin:
@@ -208,6 +212,80 @@ class StepperMotor:
 
 
 
+class ServoMotor:
+    def __init__(self, device: MCUDevice, channel: int):
+        self._dev = device
+        self._channel = channel
+    
+    @property
+    def enabled(self) -> bool:
+        res = self._dev.send_command(InterfaceCommandCode.SERVO_SET_ENABLED, self._channel, b'')
+        return bool(res.payload[0])
+    
+    @enabled.setter
+    def enabled(self, value: bool):
+        payload = struct.pack("<?", bool(value)) # 1 byte, boolean
+        self._dev.send_command(InterfaceCommandCode.SERVO_SET_ENABLED, self._channel, payload)
+    
+    def move_to(self, position: int) -> bool:
+        """Move the servo to a given position in tenths of degrees (0-1800 for 0-180 degrees)."""
+        payload = struct.pack("<H", position) # 2 bytes, little-endian unsigned integer
+        res = self._dev.send_command(InterfaceCommandCode.SERVO_MOVE_TO, self._channel, payload)
+        return bool(res.payload[0])
+    
+    @property
+    def position(self) -> int:
+        """Get the current position of the servo in tenths of degrees."""
+        res = self._dev.send_command(InterfaceCommandCode.SERVO_MOVE_TO, self._channel, b'')
+        return struct.unpack("<H", res.payload)[0] # 2 bytes, little-endian unsigned integer
+    
+    def stop(self):
+        """Stop the servo immediately"""
+        self._dev.send_command(InterfaceCommandCode.SERVO_STOP, self._channel, b'')
+    
+    @property
+    def stopped(self) -> bool:
+        """Check if the servo is stopped."""
+        res = self._dev.send_command(InterfaceCommandCode.SERVO_IS_STOPPED, self._channel, b'')
+        return bool(res.payload[0])
+    
+    def set_speed_limits(self, min_speed: int, max_speed: int) -> None:
+        """Set the minimum and maximum speed for the servo in tenths of degrees per second."""
+        if min_speed < 0 or max_speed < 0:
+            raise ValueError("Speed limits must be non-negative")
+        if min_speed >= max_speed:
+            raise ValueError("min_speed must be less than max_speed")
+        payload = struct.pack("<HH", min_speed, max_speed) # 4 bytes, two little-endian unsigned integers
+        self._dev.send_command(InterfaceCommandCode.SERVO_SET_SPEED_LIMITS, self._channel, payload)
+    
+    def set_acceleration(self, acceleration: int) -> None:
+        """Set the acceleration for the servo in tenths of degrees per second squared."""
+        payload = struct.pack("<H", acceleration)  # 2 bytes, little-endian unsigned integer
+        self._dev.send_command(InterfaceCommandCode.SERVO_SET_ACCELERATION, self._channel, payload)
+
+    def set_duty_limits(self, min_duty_us: int, max_duty_us: int) -> None:
+        """Set the minimum and maximum duty cycle for the servo in microseconds.
+        
+         min_duty_us: Pulse width in microseconds (e.g. 1000 for 1ms) for the minimum position (0 degrees)
+         max_duty_us: Pulse width in microseconds (e.g. 2000 for 2ms) for the maximum position (180 degrees)
+        """
+        if min_duty_us < 0 or max_duty_us < 0:
+            raise ValueError("Duty limits must be non-negative")
+        if min_duty_us >= max_duty_us:
+            raise ValueError("min_duty_us must be less than max_duty_us")
+        if max_duty_us > 20000:
+            raise ValueError("max_duty_us must be less than or equal to 20000 (20ms period)")
+        # Calculate the duty cycle as a value from 0 to 65535 based on a pulse frequency of 50Hz (20ms period).
+        min_duty = int((min_duty_us / 20000) * 65535)
+        max_duty = int((max_duty_us / 20000) * 65535)
+        payload = struct.pack("<HH", min_duty, max_duty)  # 4 bytes, two little-endian unsigned integers
+        self._dev.send_command(InterfaceCommandCode.SERVO_SET_DUTY_LIMITS, self._channel, payload)
+    
+    @property
+    def channel(self):
+        return self._channel
+
+
 class SorterInterface(MCUDevice):
     steppers : tuple[StepperMotor, ...]
     digital_inputs : tuple[DigitalInputPin, ...]
@@ -231,9 +309,11 @@ class SorterInterface(MCUDevice):
         digital_input_channels = range(self._board_info.get("digital_input_count", 0))
         digital_output_channels = range(self._board_info.get("digital_output_count", 0))
         stepper_channels = range(self._board_info.get("stepper_count", 0))
+        servo_channels = range(self._board_info.get("servo_count", 0))
         self.digital_inputs = tuple(DigitalInputPin(self, ch) for ch in digital_input_channels)
         self.digital_outputs = tuple(DigitalOutputPin(self, ch) for ch in digital_output_channels)
         self.steppers = tuple(StepperMotor(self, ch) for ch in stepper_channels)
+        self.servos = tuple(ServoMotor(self, ch) for ch in servo_channels)
         # Read the device name from the board info, or use a default name based on the address if not provided
         self._name = self._board_info.get("device_name", f"SorterInterface_{address}")
 
